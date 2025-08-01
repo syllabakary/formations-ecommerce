@@ -50,12 +50,12 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-bold mb-6">Liens Utiles</h3>
             <ul className="space-y-3">
-              <li><button onClick={() => navigate('/a-propos')} className="text-gray-400 hover:text-white transition-colors text-left w-full">À propos de nous</button></li>
-              <li><button onClick={() => navigate('/temoignages')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Témoignages</button></li>
+              <li><button onClick={() => navigate('/apropos')} className="text-gray-400 hover:text-white transition-colors text-left w-full">À propos de nous</button></li>
+              <li><button onClick={() => navigate('/apropos=?temoignage')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Témoignages</button></li>
               <li><button onClick={() => navigate('/blog')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Blog</button></li>
               <li><button onClick={() => navigate('/carrieres')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Carrières</button></li>
               <li><button onClick={() => navigate('/partenaires')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Partenaires</button></li>
-              <li><button onClick={() => navigate('/contact')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Contactez-nous</button></li>
+              <li><button onClick={() => navigate('/contacts')} className="text-gray-400 hover:text-white transition-colors text-left w-full">Contactez-nous</button></li>
             </ul>
           </div>
           <div>

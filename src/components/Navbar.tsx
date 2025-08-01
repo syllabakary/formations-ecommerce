@@ -76,6 +76,10 @@ const Navbar = () => {
       name: "Management",
       subcategories: ["Gestion de Projet", "Leadership", "Ressources Humaines"]
     },
+    {
+      name: "RH",
+      subcategories: ["Audit", "Leadership", "Ressources Humaines"]
+    },
   ];
 
   return (
@@ -125,6 +129,9 @@ const Navbar = () => {
               <Link to="/" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
                 Accueil
               </Link>
+              <Link to="/apropos" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
+                À propos de Nous
+              </Link>
               
               {/* Menu déroulant des formations - Desktop */}
               <div className="relative" ref={formationsRef}>
@@ -132,12 +139,12 @@ const Navbar = () => {
                   onClick={() => setIsFormationsOpen(!isFormationsOpen)}
                   className="flex items-center space-x-1 text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium"
                 >
-                  <span>Formations</span>
+                  <span>Nos Formations</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${isFormationsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
                 {isFormationsOpen && (
-                  <div className="absolute right-10 mt-2 bg-white rounded-xl shadow-lg py-4 z-50 w-max max-w-screen-md">
+                  <div className="absolute right-auto left-auto mt-2 bg-white rounded-xl shadow-lg py-4 z-50 w-max max-w-screen-md">
                     <div className="flex flex-col">
                       <Link to="/catalog" className="px-4 py-2 text-purple-900 font-medium hover:bg-purple-100 rounded-t-lg whitespace-nowrap">
                         Toutes les formations
@@ -170,8 +177,8 @@ const Navbar = () => {
                       </div>
                       
                       <div className="border-t border-gray-200 my-2"></div>
-                      <Link to="/trainers" className="px-4 py-2 text-gray-800 hover:bg-purple-100 rounded-b-lg">
-                        Nos formateurs
+                      <Link to="/catalog" className="px-4 py-2 text-gray-800 hover:bg-purple-100 rounded-b-lg">
+                        Nos Formations
                       </Link>
                     </div>
                   </div>
@@ -181,7 +188,10 @@ const Navbar = () => {
               <Link to="/blog" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
                 Blog
               </Link>
-              
+             
+              <Link to="/contacts" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
+                Contactez-nous
+              </Link>
               {user ? (
                 <>
                   {/* Menu profil */}
@@ -250,13 +260,13 @@ const Navbar = () => {
               <Link to="/" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
                 Accueil
               </Link>
+              <Link to="/apropos" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
+                À propos de nous
+              </Link>
+              
               
               {/* Menu mobile des formations avec accordéon */}
               <div className="space-y-1">
-                <Link to="/catalog" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md font-medium">
-                  Toutes les formations
-                </Link>
-                
                 {formationCategories.map((category) => (
                   <div key={category.name} className="border-l-2 border-purple-700 ml-2">
                     {/* Titre de catégorie cliquable */}
@@ -285,13 +295,16 @@ const Navbar = () => {
                   </div>
                 ))}
                 
-                <Link to="/trainers" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md mt-2">
-                  Nos formateurs
+                <Link to="/catalog" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md mt-2">
+                  Nos formations
                 </Link>
               </div>
               
               <Link to="/blog" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
                 Blog
+              </Link>
+              <Link to="/contacts" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
+                Contactez-nous
               </Link>
               
               {user ? (

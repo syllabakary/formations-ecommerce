@@ -10,7 +10,8 @@ import PaymentPage from './pages/paiement.tsx';
 import Footer from './components/Footer';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
-
+import Apropos from './pages/apropos.tsx';
+import Contact from './pages/Contacts.tsx';
 function App() {
   return (
     <AuthProvider>
@@ -26,6 +27,8 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/paiement" element={<PaymentPage />} />
+                <Route path="/apropos" element={<Apropos />} />
+                <Route path="/contacts" element={<Contact />} />
               </Routes>
             </div>
             <Footer />

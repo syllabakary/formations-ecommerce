@@ -189,7 +189,7 @@ const ModernCatalog = () => {
       type: "Spécialisation",
       price: 50700,
       originalPrice: 74550,
-      image: "/api/placeholder/400/250",
+      image: "/asset/femme-removebg-preview.png",
       description: "Tableau, Power BI et analyse de données pour la prise de décision",
       duration: "32h",
       students: 1123,
@@ -688,7 +688,7 @@ const categoryConfig: CategoryConfig = {
                 Essayez de modifier vos critères de recherche ou explorez nos catégories populaires.
               </p>
               <button
-                onClick={clearAllFilters}
+                onClick={() => navigate('/catalog')}
                 className="px-8 py-4 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white rounded-2xl hover:shadow-lg transition-all transform hover:scale-105"
               >
                 Voir toutes les formations

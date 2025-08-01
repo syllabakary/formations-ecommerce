@@ -42,19 +42,22 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
         />
       )}
       
-      {/* Sidebar */}
-      <div className={`fixed top-0 left-0 z-50 w-64 h-full bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
+       {/* Sidebar */}
+       <div className={`fixed top-0 left-0 z-50 w-64 h-full bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } lg:translate-x-0`}>
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+        <div className="flex items-center justify-between p-6 ">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-[#A553C4] to-[#6636DD] flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
+            {/* Logo Image */}
+            <img 
+              src="/asset/LOGO_EMPOWER_FORMATION/LOGO EF - 3 - PNG.png" 
+              alt="" 
+              className="w-8 h-8 rounded-xl object-cover"
+            />
             <div>
-              <h1 className="text-lg font-bold text-gray-800">FormationPro</h1>
+              
               <p className="text-xs text-gray-500">Admin Dashboard</p>
             </div>
           </div>
