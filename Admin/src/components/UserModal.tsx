@@ -1,30 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { User } from '../types';
 import Modal from './Modal';
-import { Save, Upload } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
+
+// Types alignés avec l'API Laravel
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'Étudiant' | 'Instructeur' | 'Admin';
+  status: 'Actif' | 'Inactif' | 'Suspendu';
+  avatar: string;
+  join_date: string;
+  courses_enrolled?: number;
+  courses_completed?: number;
+  courses_created?: number;
+  last_active: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
   user?: User;
-  onSave: (user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onSave: (user: Omit<User, 'id' | 'created_at' | 'updated_at'>) => Promise<{ success: boolean; message?: string }>;
+  isSubmitting?: boolean;
 }
 
-const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) => {
+const UserModal: React.FC<UserModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  user, 
+  onSave, 
+  isSubmitting = false 
+}) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     role: 'Étudiant' as const,
+    status: 'Actif' as const,
     avatar: '',
-    joinDate: new Date().toISOString().split('T')[0],
-    lastActive: 'Il y a quelques instants',
-    coursesEnrolled: 0,
-    coursesCompleted: 0,
-    coursesCreated: 0,
-    status: 'Actif' as const
+    join_date: new Date().toISOString().split('T')[0],
+    last_active: 'Il y a quelques instants',
+    courses_enrolled: 0,
+    courses_completed: 0,
+    courses_created: 0,
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
+
+  // Réinitialiser le formulaire quand l'utilisateur change ou quand la modal s'ouvre/ferme
   useEffect(() => {
     if (user) {
       setFormData({
@@ -32,13 +60,13 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
         email: user.email,
         phone: user.phone,
         role: user.role,
-        avatar: user.avatar,
-        joinDate: user.joinDate,
-        lastActive: user.lastActive,
-        coursesEnrolled: user.coursesEnrolled,
-        coursesCompleted: user.coursesCompleted,
-        coursesCreated: user.coursesCreated || 0,
-        status: user.status
+        status: user.status,
+        avatar: user.avatar || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150',
+        join_date: user.join_date,
+        last_active: user.last_active,
+        courses_enrolled: user.courses_enrolled || 0,
+        courses_completed: user.courses_completed || 0,
+        courses_created: user.courses_created || 0,
       });
     } else {
       setFormData({
@@ -46,22 +74,83 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
         email: '',
         phone: '',
         role: 'Étudiant',
+        status: 'Actif',
         avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150',
-        joinDate: new Date().toISOString().split('T')[0],
-        lastActive: 'Il y a quelques instants',
-        coursesEnrolled: 0,
-        coursesCompleted: 0,
-        coursesCreated: 0,
-        status: 'Actif'
+        join_date: new Date().toISOString().split('T')[0],
+        last_active: 'Il y a quelques instants',
+        courses_enrolled: 0,
+        courses_completed: 0,
+        courses_created: 0,
       });
     }
+    setErrors({});
   }, [user, isOpen]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-    onClose();
+  // Validation du formulaire
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Le nom est obligatoire';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'L\'email est obligatoire';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'L\'email n\'est pas valide';
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Le téléphone est obligatoire';
+    }
+
+    if (formData.avatar && !/^https?:\/\/.+/.test(formData.avatar)) {
+      newErrors.avatar = 'L\'URL de l\'avatar n\'est pas valide';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
+
+  const handleInputChange = (field: keyof typeof formData, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Effacer l'erreur du champ modifié
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLocalSubmitting(true);
+    
+    try {
+      const result = await onSave(formData);
+      
+      if (result.success) {
+        onClose();
+      } else if (result.message) {
+        // Afficher l'erreur générale
+        setErrors({ general: result.message });
+      }
+    } catch (error) {
+      setErrors({ general: 'Une erreur inattendue s\'est produite' });
+    } finally {
+      setIsLocalSubmitting(false);
+    }
+  };
+
+  const isSubmittingState = isSubmitting || isLocalSubmitting;
 
   return (
     <Modal
@@ -71,6 +160,13 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Erreur générale */}
+        {errors.general && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-800 text-sm">{errors.general}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Nom */}
           <div>
@@ -81,10 +177,14 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
               type="text"
               required
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent ${
+                errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
               placeholder="Ex: Marie Dubois"
+              disabled={isSubmittingState}
             />
+            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
           </div>
 
           {/* Email */}
@@ -96,10 +196,14 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
               type="email"
               required
               value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent ${
+                errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
               placeholder="Ex: marie.dubois@email.com"
+              disabled={isSubmittingState}
             />
+            {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
           </div>
 
           {/* Téléphone */}
@@ -111,10 +215,14 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
               type="tel"
               required
               value={formData.phone}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
-              placeholder="Ex: +33 6 12 34 56 78"
+              onChange={(e) => handleInputChange('phone', e.target.value)}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent ${
+                errors.phone ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
+              placeholder="Ex: +225 12 34 56 78"
+              disabled={isSubmittingState}
             />
+            {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
           </div>
 
           {/* Rôle */}
@@ -125,8 +233,9 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
             <select
               required
               value={formData.role}
-              onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as 'Étudiant' | 'Instructeur' | 'Admin' }))}
+              onChange={(e) => handleInputChange('role', e.target.value as 'Étudiant' | 'Instructeur' | 'Admin')}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+              disabled={isSubmittingState}
             >
               <option value="Étudiant">Étudiant</option>
               <option value="Instructeur">Instructeur</option>
@@ -142,8 +251,9 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
             <select
               required
               value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'Actif' | 'Inactif' | 'Suspendu' }))}
+              onChange={(e) => handleInputChange('status', e.target.value as 'Actif' | 'Inactif' | 'Suspendu')}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+              disabled={isSubmittingState}
             >
               <option value="Actif">Actif</option>
               <option value="Inactif">Inactif</option>
@@ -158,9 +268,10 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
             </label>
             <input
               type="date"
-              value={formData.joinDate}
-              onChange={(e) => setFormData(prev => ({ ...prev, joinDate: e.target.value }))}
+              value={formData.join_date}
+              onChange={(e) => handleInputChange('join_date', e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+              disabled={isSubmittingState}
             />
           </div>
 
@@ -174,9 +285,10 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
                 <input
                   type="number"
                   min="0"
-                  value={formData.coursesEnrolled}
-                  onChange={(e) => setFormData(prev => ({ ...prev, coursesEnrolled: parseInt(e.target.value) || 0 }))}
+                  value={formData.courses_enrolled}
+                  onChange={(e) => handleInputChange('courses_enrolled', parseInt(e.target.value) || 0)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+                  disabled={isSubmittingState}
                 />
               </div>
 
@@ -187,9 +299,11 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
                 <input
                   type="number"
                   min="0"
-                  value={formData.coursesCompleted}
-                  onChange={(e) => setFormData(prev => ({ ...prev, coursesCompleted: parseInt(e.target.value) || 0 }))}
+                  max={formData.courses_enrolled}
+                  value={formData.courses_completed}
+                  onChange={(e) => handleInputChange('courses_completed', parseInt(e.target.value) || 0)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+                  disabled={isSubmittingState}
                 />
               </div>
             </>
@@ -204,9 +318,10 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
               <input
                 type="number"
                 min="0"
-                value={formData.coursesCreated}
-                onChange={(e) => setFormData(prev => ({ ...prev, coursesCreated: parseInt(e.target.value) || 0 }))}
+                value={formData.courses_created}
+                onChange={(e) => handleInputChange('courses_created', parseInt(e.target.value) || 0)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+                disabled={isSubmittingState}
               />
             </div>
           )}
@@ -219,10 +334,15 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
             <input
               type="url"
               value={formData.avatar}
-              onChange={(e) => setFormData(prev => ({ ...prev, avatar: e.target.value }))}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
+              onChange={(e) => handleInputChange('avatar', e.target.value)}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#A553C4] focus:border-transparent ${
+                errors.avatar ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
               placeholder="https://example.com/avatar.jpg"
+              disabled={isSubmittingState}
             />
+            {errors.avatar && <p className="mt-1 text-sm text-red-600">{errors.avatar}</p>}
+            
             {formData.avatar && (
               <div className="mt-2">
                 <img
@@ -244,16 +364,25 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
             type="button"
             onClick={onClose}
             className="px-6 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            disabled={isSubmittingState}
           >
             Annuler
           </button>
           <button
             type="submit"
-            className="flex items-center space-x-2 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+            disabled={isSubmittingState}
+            className="flex items-center space-x-2 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
-            <Save className="w-5 h-5" />
+            {isSubmittingState ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Save className="w-5 h-5" />
+            )}
             <span className="font-medium">
-              {user ? 'Mettre à jour' : 'Créer l\'utilisateur'}
+              {isSubmittingState
+                ? (user ? 'Mise à jour...' : 'Création...')
+                : (user ? 'Mettre à jour' : 'Créer l\'utilisateur')
+              }
             </span>
           </button>
         </div>

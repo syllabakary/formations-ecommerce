@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from './hooks/useTheme';
+import { AuthProvider } from '../../src/context/AuthContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -8,7 +9,7 @@ import Users from './components/Users';
 import Statistics from './components/Statistics';
 import Settings from './components/Settings';
 import Documentation from './components/Documentation';
-im
+import FormationPresentiel from './components/FormationPresentiel';
 
 function App() {
   useTheme(); // Appliquer le thème
@@ -22,7 +23,7 @@ function App() {
       case 'formations':
         return <Formations />;
       case 'formations presentielles':
-        return <Formations />;
+        return <FormationPresentiel />;
       case 'users':
         return <Users />;
       case 'statistics':
@@ -37,20 +38,22 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab}
-        isOpen={sidebarOpen}
-        setIsOpen={setSidebarOpen}
-      />
-      <div className="lg:ml-64">
-        <Header setSidebarOpen={setSidebarOpen} />
-        <main className="p-4 lg:p-8 dark:text-white">
-          {renderContent()}
-        </main>
+    <AuthProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isOpen={sidebarOpen}
+          setIsOpen={setSidebarOpen}
+        />
+        <div className="lg:ml-64">
+          <Header setSidebarOpen={setSidebarOpen} />
+          <main className="p-4 lg:p-8 dark:text-white">
+            {renderContent()}
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthProvider>
   );
 }
 

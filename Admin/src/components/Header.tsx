@@ -1,12 +1,15 @@
 import React from 'react';
-import { Search, Bell, User, Menu } from 'lucide-react';
+import { Search, Bell, User, Menu, LogOut } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
+import { useAuth } from './AuthProvider';
 
 interface HeaderProps {
   setSidebarOpen: (open: boolean) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
+  const { user, logout } = useAuth();
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 px-4 lg:px-8 py-4">
       <div className="flex items-center justify-between">
@@ -35,13 +38,44 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
           <NotificationCenter />
 
           {/* Profile */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 relative group">
             <div className="hidden md:block text-right">
-              <p className="text-sm font-medium text-gray-800">Admin User</p>
-              <p className="text-xs text-gray-500">Administrateur</p>
+              <p className="text-sm font-medium text-gray-800">{user?.name || 'Utilisateur'}</p>
+              <p className="text-xs text-gray-500 capitalize">{user?.role || 'Admin'}</p>
             </div>
-            <div className="w-10 h-10 bg-gradient-to-r from-[#A553C4] to-[#6636DD] rounded-xl flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
+            <div className="relative">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="w-10 h-10 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-r from-[#A553C4] to-[#6636DD] rounded-xl flex items-center justify-center">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+              )}
+              
+              {/* Menu déroulant */}
+              <div className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="p-4 border-b border-gray-100">
+                  <p className="font-medium text-gray-800">{user?.name}</p>
+                  <p className="text-sm text-gray-500">{user?.email}</p>
+                </div>
+                <div className="p-2">
+                  <button className="w-full flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                    <User className="w-4 h-4" />
+                    <span>Mon Profil</span>
+                  </button>
+                  <button 
+                    onClick={logout}
+                    className="w-full flex items-center space-x-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Déconnexion</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

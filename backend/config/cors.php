@@ -25,8 +25,10 @@ return [
         'http://localhost:5173',    // Vite dev
         'http://127.0.0.1:5173',   // Vite dev alternative
         'http://localhost:5175',    // Vite dev (current)
-        'http://127.0.0.1:5175',   // Vite dev alternative (current)
-        // Ajoute ici tes domaines de production
+        'http://127.0.0.1:5175',
+        'http://localhost:5174',    // Vite dev (current)
+        'http://127.0.0.1:5174',
+        // Add your production domains here
     ],
 
     'allowed_origins_patterns' => [],

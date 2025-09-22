@@ -4,9 +4,10 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Requests;
-use App\Http\Controllers\TrainingController;
-use App\Http\Controllers\TrainingRegistrationController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\api\TrainingController;
+use App\Http\Controllers\api\TrainingRegistrationController;
+use App\Http\Controllers\api\DashboardController;
+use App\Http\Controllers\admin\ManagerUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,15 +43,15 @@ Route::prefix('v1')->group(function () {
 
 
 
-// Routes protégées par Sanctum
+
+
+// Routes protégées par Sanctum (utilisateurs connectés)
 Route::middleware('auth:sanctum')->group(function () {
-    // Informations utilisateur
+    // Authentification
     Route::get('/user', [AuthController::class, 'user']);
-    
-    // Déconnexion
     Route::post('/logout', [AuthController::class, 'logout']);
     
-    // Autres routes protégées...
+    // Dashboard général
     Route::get('/dashboard', function (Request $request) {
         return response()->json([
             'success' => true,
@@ -58,13 +59,52 @@ Route::middleware('auth:sanctum')->group(function () {
             'user' => $request->user()
         ]);
     });
+    
+    // Routes admin (nécessite le rôle Admin)
+    Route::prefix('admin')->group(function () {
+        // Gestion des utilisateurs
+        Route::get('/users', [ManagerUserController ::class, 'getUsers']);
+        Route::post('/users', [ManagerUserController ::class, 'createUser']);
+        Route::get('/users/{id}', [ManagerUserController ::class, 'getUserById']);
+        Route::put('/users/{id}', [ManagerUserController ::class, 'updateUser']);
+        Route::delete('/users/{id}', [ManagerUserController ::class, 'deleteUser']);
+         
+        // Actions en lot
+        Route::post('/users/bulk-delete', [ManagerUserController ::class, 'bulkDeleteUsers']);
+        
+        // Gestion des statuts
+        Route::patch('/users/{id}/status', [ManagerUserController ::class, 'toggleUserStatus']);
+        Route::patch('/users/{id}/reset-password', [ManagerUserController ::class, 'resetUserPassword']);
+        
+        // Statistiques admin
+        Route::get('/stats', [ManagerUserController ::class, 'getDashboardStats']);
+    });
 });
 
-// Route de test
-Route::get('/test', function () {
-    return response()->json([
-        'success' => true,
-        'message' => 'API fonctionne !',
-        'timestamp' => now()
-    ]);
+// Routes pour les instructeurs (nécessite le rôle Instructeur ou Admin)
+Route::middleware(['auth:sanctum', 'role:Instructeur,Admin'])->group(function () {
+    Route::prefix('instructor')->group(function () {
+        // Gestion des cours (à implémenter selon vos besoins)
+        Route::get('/courses', function () {
+            return response()->json(['message' => 'Mes cours']);
+        });
+    });
+});
+
+// Routes pour les étudiants (tous les utilisateurs connectés)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::prefix('student')->group(function () {
+        // Profil étudiant
+        Route::get('/profile', function (Request $request) {
+            return response()->json([
+                'success' => true,
+                'data' => $request->user()
+            ]);
+        });
+        
+        // Formations de l'étudiant (à implémenter selon vos besoins)
+        Route::get('/courses', function () {
+            return response()->json(['message' => 'Mes formations']);
+        });
+    });
 });
