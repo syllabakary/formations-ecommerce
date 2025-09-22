@@ -61,24 +61,29 @@ const ContactPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-purple-50 via-white to-purple-100 py-20 overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-200 rounded-full opacity-30 transform translate-x-32 -translate-y-32"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-300 rounded-full opacity-40 transform -translate-x-16 translate-y-16"></div>
-        
+     {/* Hero Section */}
+        <section
+        className="relative bg-cover bg-center py-20 overflow-hidden"
+        style={{
+            backgroundImage: "url('Public/asset/femme.png')"
+        }}
+        >
+        {/* Overlay pour assombrir légèrement l'image */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/70 via-purple-800/50 to-purple-700/40"></div>
+
         <div className="max-w-7xl mx-auto px-4 relative z-10">
-          <div className="text-center">
-            <h1 className="text-5xl lg:text-6xl font-bold text-purple-900 mb-6">
-              Contactez-Nous
+            <div className="text-center">
+            <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6">
+                Contactez-Nous
             </h1>
-            <div className="w-32 h-1 bg-purple-600 mx-auto mb-8"></div>
-            <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-              Nous sommes là pour vous accompagner dans votre parcours de formation. 
-              N'hésitez pas à nous contacter pour toute question ou information.
+            <div className="w-32 h-1 bg-white mx-auto mb-8"></div>
+            <p className="text-xl text-gray-100 max-w-3xl mx-auto leading-relaxed">
+                Nous sommes là pour vous accompagner dans votre parcours de formation.
+                N'hésitez pas à nous contacter pour toute question ou information.
             </p>
-          </div>
+            </div>
         </div>
-      </section>
+        </section>
 
       {/* Contact Form & Info Section */}
       <section className="py-16 bg-white">

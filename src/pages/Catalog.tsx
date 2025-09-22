@@ -1,7 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, Star, Clock, Users, Play, BookOpen, Award, TrendingUp, Code, Palette, Database, Shield, ArrowRight, Heart, Share2, ChevronDown } from 'lucide-react';
+import { Search, Filter, X, Star, Clock, Users, Play, BookOpen,
+   Award, TrendingUp, Code,
+  Shield, Database, Palette, 
+  Briefcase, BarChart, Languages, 
+  Calculator, Heart, Wrench, Truck, Leaf} from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
 type CategoryConfig = {
@@ -71,148 +75,29 @@ const ModernCatalog = () => {
       progress: 0,
       difficulty: "Difficile"
     },
-    {
-      id: 3,
-      title: "Audit et Contrôle Interne",
-      category: "Audit",
-      level: "Intermédiaire",
-      type: "Certification",
-      price: 56650,
-      originalPrice: 89550,
-      image: "",
-      description: "Maîtrisez les techniques d'audit et les processus de contrôle interne",
-      duration: "35h",
-      students: 567,
-      rating: 4.7,
-      reviews: 89,
-      instructor: "Marie Leroy",
-      modules: 10,
-      skills: ["Audit financier", "Contrôle interne", "Risques", "Conformité"],
-      trending: false,
-      bestseller: false,
-      progress: 0,
-      difficulty: "Modéré"
-    },
-    {
-      id: 4,
-      title: "Data Science & IA",
-      category: "Data Science",
-      level: "Avancé",
-      type: "Spécialisation",
-      price: 77550,
-      originalPrice: 119400,
-      image: "",
-      description: "Python, Machine Learning, Deep Learning et analyse prédictive",
-      duration: "50h",
-      students: 2340,
-      rating: 4.8,
-      reviews: 456,
-      instructor: "Alex Chen",
-      modules: 15,
-      skills: ["Python", "Machine Learning", "TensorFlow", "Pandas"],
-      trending: true,
-      bestseller: true,
-      progress: 0,
-      difficulty: "Difficile"
-    },
-    {
-      id: 5,
-      title: "Design UX/UI Moderne",
-      category: "Design",
-      level: "Débutant",
-      type: "Formation",
-      price: 41750,
-      originalPrice: 59700,
-      image: "/api/placeholder/400/250",
-      description: "Créez des expériences utilisateur exceptionnelles avec Figma",
-      duration: "28h",
-      students: 1456,
-      rating: 4.9,
-      reviews: 287,
-      instructor: "Emma Rodriguez",
-      modules: 9,
-      skills: ["Figma", "Prototypage", "Design System", "User Research"],
-      trending: true,
-      bestseller: false,
-      progress: 0,
-      difficulty: "Facile"
-    },
-    {
-      id: 6,
-      title: "Évaluation et Rémunération",
-      category: "Ressources Humaines",
-      level: "Intermédiaire",
-      type: "Formation",
-      price: 44750,
-      originalPrice: 65650,
-      image: "/api/placeholder/400/250",
-      description: "Politiques de rémunération, évaluation des postes et performance",
-      duration: "22h",
-      students: 678,
-      rating: 4.6,
-      reviews: 134,
-      instructor: "Pierre Moreau",
-      modules: 7,
-      skills: ["Évaluation postes", "Grilles salariales", "Variable", "Équité"],
-      trending: false,
-      bestseller: false,
-      progress: 0,
-      difficulty: "Modéré"
-    },
-    {
-      id: 7,
-      title: "Cybersécurité Entreprise",
-      category: "Sécurité",
-      level: "Avancé",
-      type: "Certification",
-      price: 71550,
-      originalPrice: 107400,
-      image: "/api/placeholder/400/250",
-      description: "Protégez votre organisation contre les cybermenaces actuelles",
-      duration: "40h",
-      students: 834,
-      rating: 4.8,
-      reviews: 198,
-      instructor: "Thomas Garcia",
-      modules: 12,
-      skills: ["Sécurité réseau", "Pentest", "ISO 27001", "RGPD"],
-      trending: true,
-      bestseller: false,
-      progress: 0,
-      difficulty: "Difficile"
-    },
-    {
-      id: 8,
-      title: "Business Intelligence",
-      category: "Data Science",
-      level: "Intermédiaire",
-      type: "Spécialisation",
-      price: 50700,
-      originalPrice: 74550,
-      image: "/asset/femme-removebg-preview.png",
-      description: "Tableau, Power BI et analyse de données pour la prise de décision",
-      duration: "32h",
-      students: 1123,
-      rating: 4.7,
-      reviews: 267,
-      instructor: "Laura Kim",
-      modules: 11,
-      skills: ["Tableau", "Power BI", "SQL", "Data Visualization"],
-      trending: false,
-      bestseller: true,
-      progress: 0,
-      difficulty: "Modéré"
-    }
+   
+   
+
+   
+   
   ];
 
   // Configuration des catégories avec les nouvelles couleurs personnalisées
 const categoryConfig: CategoryConfig = {
-  "Développement": { icon: Code, color: "purple", gradient: "from-purple-500 via-[#A553C4] to-[#6636DD]" },
-  "Ressources Humaines": { icon: Users, color: "blue", gradient: "from-[#6636DD] via-[#A553C4] to-purple-600" },
-  "Audit": { icon: Shield, color: "green", gradient: "from-[#22c55e] via-green-500 to-emerald-600" },
-  "Data Science": { icon: Database, color: "primary", gradient: "from-[#A553C4] via-purple-500 to-[#6636DD]" },
-  "Design": { icon: Palette, color: "secondary", gradient: "from-[#6636DD] via-indigo-600 to-purple-700" },
-  "Sécurité": { icon: Shield, color: "warning", gradient: "from-[#2D1397] via-indigo-800 to-purple-900" }
+  "Développement": { icon: Code, color: "white", gradient: "from-white to-white" },
+  "Ressources Humaines": { icon: Users, color: "white", gradient: "from-white to-white" },
+  "Audit & Finance": { icon: Calculator, color: "white", gradient: "from-white to-white" },
+  "Data Science": { icon: Database, color: "white", gradient: "from-white to-white" },
+  "Design": { icon: Palette, color: "white", gradient: "from-white to-white" },
+  "Sécurité Informatique": { icon: Shield, color: "white", gradient: "from-white to-white" },
+  "Management & Leadership": { icon: Briefcase, color: "white", gradient: "from-white to-white" },
+  "Commerce & Marketing": { icon: BarChart, color: "white", gradient: "from-white to-white" },
+  "Langues & Communication": { icon: Languages, color: "white", gradient: "from-white to-white" },
+  "Développement Personnel": { icon: BookOpen, color: "white", gradient: "from-white to-white" },
+  "Santé & Sécurité au travail": { icon: Heart, color: "white", gradient: "from-white to-white" },
+  "Industrie & Maintenance": { icon: Wrench, color: "white", gradient: "from-white to-white" },
+  "Logistique & Supply Chain": { icon: Truck, color: "white", gradient: "from-white to-white" },
+  "Énergies & Environnement": { icon: Leaf, color: "white", gradient: "from-white to-white" },
 };
 
   const levels = ["Débutant", "Intermédiaire", "Avancé"];

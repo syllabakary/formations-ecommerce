@@ -10,7 +10,6 @@ const Navbar = () => {
   const [isFormationsOpen, setIsFormationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  // État pour les menus de catégories en version mobile
   const [expandedCategory, setExpandedCategory] = useState(null);
   
   const { state } = useCart();
@@ -20,7 +19,6 @@ const Navbar = () => {
   const formationsRef = useRef(null);
   const profileMenuRef = useRef(null);
 
-  // Fermer les menus déroulants quand on clique en dehors
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (formationsRef.current && !formationsRef.current.contains(event.target)) {
@@ -37,7 +35,6 @@ const Navbar = () => {
     };
   }, []);
 
-  // Fermer les menus déroulants quand on change de page
   useEffect(() => {
     setIsFormationsOpen(false);
     setIsMobileMenuOpen(false);
@@ -54,11 +51,10 @@ const Navbar = () => {
     setExpandedCategory(expandedCategory === categoryName ? null : categoryName);
   };
 
-  // Structure des catégories de formation
   const formationCategories = [
     {
       name: "Développement",
-      subcategories: ["Web", "Mobile", "DevOps", "Backend", "Frontend"]
+      subcategories: ["'Web Development", "Mobile Development", "DevOps", "Backend Development", "Frontend Development"]
     },
     {
       name: "Data Science",
@@ -66,107 +62,102 @@ const Navbar = () => {
     },
     {
       name: "Design",
-      subcategories: ["UI/UX", "UX Research", "Graphic Design", "Motion Design"]
+      subcategories: ["UI/UX Design", "Graphic Design", "Motion Design"]
     },
     {
       name: "Marketing",
-      subcategories: ["Digital", "SEO", "Social Media", "Content Marketing"]
+      subcategories: ["Digital Marketing", "SEO", "Social Media Marketing", "Content Marketing"]
     },
     {
       name: "Management",
-      subcategories: ["Gestion de Projet", "Leadership", "Ressources Humaines"]
+      subcategories: ["Project Management", "Team Management", "Time Management"]
     },
     {
       name: "RH",
-      subcategories: ["Audit", "Leadership", "Ressources Humaines"]
+      subcategories: ["Recrutement", "Gestion des ressources humaines", "Formation des employés"]
     },
   ];
 
   return (
     <>
-      <nav className="bg-gradient-to-r from-purple-800 via-purple-900 to-indigo-900 text-white shadow-lg">
+      <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between h-16">
+            
             {/* Logo */}
             <div className="flex-shrink-0">
-              <Link to="/" className="flex items-center space-x-2">
-              <img 
-  src="/asset/LOGO EMPOWER FORMATION/LOGO EF - 3.jpg" 
-  alt="Logo Empower Formation"
-  className="h-auto w-auto max-h-12 md:max-h-12 lg:max-h-8 object-contain"
-/>
+              <Link to="/" className="flex items-center">
+                <img 
+                  src="/asset/LOGO EMPOWER FORMATION/LOGO EF - 3.jpg" 
+                  alt="Empower Formation"
+                  className="h-12 w-auto object-contain"
+                />
               </Link>
             </div>
             
-            {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
-              <button
-                onClick={() => setIsCartOpen(true)}
-                className="relative mr-4"
+            {/* Navigation principale - Desktop */}
+            <div className="hidden lg:flex items-center space-x-8">
+              <Link 
+                to="/" 
+                className="text-gray-900 hover:text-blue-600 font-medium transition-colors duration-200"
               >
-                <ShoppingCart className="h-6 w-6 hover:text-purple-300" />
-                {state.items.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-pink-600 text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {state.items.length}
-                  </span>
-                )}
-              </button>
-              
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-purple-700"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </button>
-            </div>
-            
-            {/* Desktop menu */}
-            <div className="hidden md:flex md:items-center md:space-x-8">
-              <Link to="/" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
                 Accueil
               </Link>
-              <Link to="/apropos" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
-                À propos de Nous
-              </Link>
               
-              {/* Menu déroulant des formations - Desktop */}
+              <Link 
+                to="/apropos" 
+                className="text-gray-900 hover:text-blue-600 font-medium transition-colors duration-200"
+              >
+                À propos
+              </Link>
+              <Link 
+                to="/catalog2" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              > Nos Cataloge              
+              </Link>
+
+              <Link 
+                to="/presentiel" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              > Formation presentiel             
+              </Link>
+                
+              
+              {/* Menu Formations */}
               <div className="relative" ref={formationsRef}>
                 <button
                   onClick={() => setIsFormationsOpen(!isFormationsOpen)}
-                  className="flex items-center space-x-1 text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium"
+                  className="flex items-center space-x-1 text-gray-900 hover:text-blue-600 font-medium transition-colors duration-200"
                 >
-                  <span>Nos Formations</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${isFormationsOpen ? 'rotate-180' : ''}`} />
+                  <span>Formations</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFormationsOpen ? 'rotate-180' : ''}`} />
                 </button>
-                
+               
                 {isFormationsOpen && (
-                  <div className="absolute right-auto left-auto mt-2 bg-white rounded-xl shadow-lg py-4 z-50 w-max max-w-screen-md">
-                    <div className="flex flex-col">
-                      <Link to="/catalog" className="px-4 py-2 text-purple-900 font-medium hover:bg-purple-100 rounded-t-lg whitespace-nowrap">
-                        Toutes les formations
+                  <div className="absolute left-0 mt-3 bg-white rounded-xl shadow-lg border border-gray-100 py-6 z-50 w-[800px]">
+                    <div className="px-6">
+                      <Link 
+                        to="/catalog" 
+                        className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 transition-colors mb-4"
+                      >
+                        Voir toutes les formations
                       </Link>
-                      <div className="border-t border-gray-200 my-2"></div>
                       
-                      {/* Grid pour les catégories en desktop */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 px-4">
+                      <div className="grid grid-cols-3 gap-6 mt-4">
                         {formationCategories.map((category) => (
-                          <div key={category.name} className="mb-2">
+                          <div key={category.name} className="space-y-3">
                             <Link 
                               to={`/catalog?category=${category.name}`}
-                              className="font-medium text-purple-900 hover:text-purple-700 mb-2 block"
+                              className="font-semibold text-gray-900 hover:text-blue-600 text-sm block"
                             >
                               {category.name}
                             </Link>
-                            <div className="flex flex-col space-y-1">
-                              {category.subcategories.map((subcategory) => (
+                            <div className="space-y-2">
+                              {category.subcategories.slice(0, 4).map((subcategory) => (
                                 <Link
                                   key={subcategory}
                                   to={`/catalog?category=${category.name}&subcategory=${subcategory}`}
-                                  className="text-sm text-gray-700 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded"
+                                  className="block text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
                                 >
                                   {subcategory}
                                 </Link>
@@ -175,50 +166,65 @@ const Navbar = () => {
                           </div>
                         ))}
                       </div>
-                      
-                      <div className="border-t border-gray-200 my-2"></div>
-                      <Link to="/catalog" className="px-4 py-2 text-gray-800 hover:bg-purple-100 rounded-b-lg">
-                        Nos Formations
-                      </Link>
                     </div>
                   </div>
                 )}
               </div>
               
-              <Link to="/blog" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
+              <Link 
+                to="/blog" 
+                className="text-gray-900 hover:text-blue-600 font-medium transition-colors duration-200"
+              >
                 Blog
               </Link>
-             
-              <Link to="/contacts" className="text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium">
-                Contactez-nous
+            
+              
+              <Link 
+                to="/contacts" 
+                className="text-gray-900 hover:text-blue-600 font-medium transition-colors duration-200"
+              >
+                Contact
               </Link>
-              {user ? (
-                <>
-                  {/* Menu profil */}
+            </div>
+            
+            {/* Actions de droite */}
+            <div className="flex items-center space-x-4">
+              
+              {/* Desktop Auth */}
+              <div className="hidden lg:flex items-center space-x-4">
+                {user ? (
                   <div className="relative" ref={profileMenuRef}>
                     <button
                       onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                      className="flex items-center space-x-2 text-white hover:text-pink-300 transition-colors px-3 py-2 rounded-md font-medium"
+                      className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      <User className="h-4 w-4" />
-                      <span>Mon Espace</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="text-gray-900 font-medium">Mon espace</span>
+                      <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
                     
                     {isProfileMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-2 z-50">
-                        <Link to="/dashboard" className="px-4 py-3 text-gray-800 hover:bg-purple-100 flex items-center space-x-2 block">
-                          <User className="h-4 w-4 text-purple-700" />
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-50">
+                        <Link 
+                          to="/dashboard" 
+                          className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <User className="h-4 w-4 text-gray-500" />
                           <span>Mon profil</span>
                         </Link>
-                        <Link to="/settings" className="px-4 py-3 text-gray-800 hover:bg-purple-100 flex items-center space-x-2 block">
-                          <Settings className="h-4 w-4 text-purple-700" />
+                        <Link 
+                          to="/settings" 
+                          className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <Settings className="h-4 w-4 text-gray-500" />
                           <span>Paramètres</span>
                         </Link>
-                        <div className="border-t border-gray-200 my-1"></div>
+                        <hr className="my-2 border-gray-100" />
                         <button
                           onClick={handleLogout}
-                          className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                          className="flex items-center space-x-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
                         >
                           <LogOut className="h-4 w-4" />
                           <span>Déconnexion</span>
@@ -226,66 +232,105 @@ const Navbar = () => {
                       </div>
                     )}
                   </div>
-                </>
-              ) : (
-                <Link 
-                  to="/login" 
-                  className="px-5 py-2 rounded-md bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 transition-colors shadow-md font-medium"
-                >
-                  Se connecter
-                </Link>
-              )}
+                ) : (
+                  <div className="flex items-center space-x-3">
+                    <Link 
+                      to="/login?setIsLogin=true" 
+                      className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+                    >
+                      Inscription
+                    </Link>
+                    <Link 
+                      to="/login" 
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      Connexion
+                    </Link>
+                  </div>
+                )}
+              </div>
               
+              {/* Panier */}
               <button
-                className="relative group"
                 onClick={() => setIsCartOpen(true)}
+                className="relative p-2 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <div className="p-2 bg-white bg-opacity-10 rounded-full hover:bg-opacity-20 transition-all">
-                  <ShoppingCart className="h-5 w-5 group-hover:text-pink-300" />
-                </div>
+                <ShoppingCart className="h-6 w-6 text-gray-700" />
                 {state.items.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-pink-600 text-xs rounded-full h-5 w-5 flex items-center justify-center shadow-md">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
                     {state.items.length}
                   </span>
+                )}
+              </button>
+              
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-6 w-6 text-gray-700" />
+                ) : (
+                  <Menu className="h-6 w-6 text-gray-700" />
                 )}
               </button>
             </div>
           </div>
         </div>
         
-        {/* Mobile menu amélioré */}
+        {/* Menu Mobile */}
         {isMobileMenuOpen && (
-          <div className="md:hidden bg-purple-900 shadow-inner">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              <Link to="/" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
+          <div className="lg:hidden bg-white border-t border-gray-100">
+            <div className="px-4 py-4 space-y-1">
+              
+              {/* Navigation */}
+              <Link 
+                to="/" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              >
                 Accueil
               </Link>
-              <Link to="/apropos" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
-                À propos de nous
+              
+              <Link 
+                to="/apropos" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              >
+                À propos
+              </Link>
+
+              <Link 
+                to="/catalog2" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              > Nos Cataloge              
               </Link>
               
               
-              {/* Menu mobile des formations avec accordéon */}
+              {/* Formations Mobile */}
               <div className="space-y-1">
+                <Link 
+                  to="/catalog" 
+                  className="block px-4 py-3 text-blue-600 font-semibold hover:bg-blue-50 rounded-lg"
+                >
+                  Toutes les formations
+                </Link>
+                
                 {formationCategories.map((category) => (
-                  <div key={category.name} className="border-l-2 border-purple-700 ml-2">
-                    {/* Titre de catégorie cliquable */}
+                  <div key={category.name} className="ml-2">
                     <button 
                       onClick={() => toggleCategoryExpansion(category.name)}
-                      className="flex justify-between items-center w-full px-3 py-2 text-white hover:bg-purple-800 rounded-md"
+                      className="flex justify-between items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg"
                     >
                       <span className="font-medium">{category.name}</span>
                       <ChevronDown className={`h-4 w-4 transition-transform ${expandedCategory === category.name ? 'rotate-180' : ''}`} />
                     </button>
                     
-                    {/* Sous-catégories avec animation */}
                     {expandedCategory === category.name && (
-                      <div className="ml-4 space-y-1 animate-fadeIn">
+                      <div className="ml-4 mt-2 space-y-1">
                         {category.subcategories.map((subcategory) => (
                           <Link
                             key={subcategory}
                             to={`/catalog?category=${category.name}&subcategory=${subcategory}`}
-                            className="block px-3 py-2 text-purple-200 hover:bg-purple-800 rounded-md text-sm"
+                            className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
                           >
                             {subcategory}
                           </Link>
@@ -294,43 +339,65 @@ const Navbar = () => {
                     )}
                   </div>
                 ))}
-                
-                <Link to="/catalog" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md mt-2">
-                  Nos formations
-                </Link>
               </div>
               
-              <Link to="/blog" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
+              <Link 
+                to="/blog" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              >
                 Blog
               </Link>
-              <Link to="/contacts" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
-                Contactez-nous
+              
+              <Link 
+                to="/contacts" 
+                className="block px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg font-medium"
+              >
+                Contact
               </Link>
               
-              {user ? (
-                <>
-                  <Link to="/dashboard" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
-                    Mon Profil
-                  </Link>
-                  <Link to="/settings" className="block px-3 py-2 text-white hover:bg-purple-800 rounded-md">
-                    Paramètres
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center space-x-2 w-full text-left px-3 py-2 text-white hover:bg-red-700 rounded-md"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>Déconnexion</span>
-                  </button>
-                </>
-              ) : (
-                <Link 
-                  to="/login" 
-                  className="block px-3 py-2 text-white bg-gradient-to-r from-pink-600 to-purple-600 rounded-md"
-                >
-                  Se connecter
-                </Link>
-              )}
+              {/* Auth Mobile */}
+              <div className="border-t border-gray-100 pt-4 mt-4">
+                {user ? (
+                  <>
+                    <Link 
+                      to="/dashboard" 
+                      className="flex items-center space-x-3 px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg"
+                    >
+                      <User className="h-5 w-5 text-gray-500" />
+                      <span className="font-medium">Mon profil</span>
+                    </Link>
+                    <Link 
+                      to="/settings" 
+                      className="flex items-center space-x-3 px-4 py-3 text-gray-900 hover:bg-gray-50 rounded-lg"
+                    >
+                      <Settings className="h-5 w-5 text-gray-500" />
+                      <span className="font-medium">Paramètres</span>
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center space-x-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <LogOut className="h-5 w-5" />
+                      <span className="font-medium">Déconnexion</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link 
+                      to="/login?setIsLogin=true" 
+                      className="block px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg font-medium"
+                    >
+                      Inscription
+                    </Link>
+                    <Link 
+                      to="/login" 
+                      className="block px-4 py-3 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium text-center"
+                    >
+                      Connexion
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

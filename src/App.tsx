@@ -12,6 +12,9 @@ import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import Apropos from './pages/apropos.tsx';
 import Contact from './pages/Contacts.tsx';
+import Presentiel from './pages/Presentiel.tsx';
+import Catalog2 from './pages/Catalog2.tsx';
+
 function App() {
   return (
     <AuthProvider>
@@ -29,6 +32,8 @@ function App() {
                 <Route path="/paiement" element={<PaymentPage />} />
                 <Route path="/apropos" element={<Apropos />} />
                 <Route path="/contacts" element={<Contact />} />
+                <Route path="/presentiel" element={<Presentiel />} />
+                <Route path="/catalog2" element={<Catalog2 />} />
               </Routes>
             </div>
             <Footer />

@@ -8,6 +8,7 @@ import Users from './components/Users';
 import Statistics from './components/Statistics';
 import Settings from './components/Settings';
 import Documentation from './components/Documentation';
+im
 
 function App() {
   useTheme(); // Appliquer le thème
@@ -19,6 +20,8 @@ function App() {
       case 'dashboard':
         return <Dashboard />;
       case 'formations':
+        return <Formations />;
+      case 'formations presentielles':
         return <Formations />;
       case 'users':
         return <Users />;
