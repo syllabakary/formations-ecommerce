@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, User, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
+import OTPForm from './OTPForm';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (credentials: { email: string; password: string }) => Promise<boolean>;
+  onLogin: (credentials: { email: string; password: string }) => Promise<{ success: boolean; requiresVerification?: boolean; userId?: number; otp?: string }>;
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => {
@@ -16,6 +17,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showOTPForm, setShowOTPForm] = useState(false);
+  const [otpUserId, setOtpUserId] = useState<number | null>(null);
+  const [otpCode, setOtpCode] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,25 +27,64 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
     setError('');
 
     try {
-      const success = await onLogin(formData);
-      if (success) {
+      const result = await onLogin(formData);
+
+      if (result.success) {
         onClose();
         setFormData({ email: '', password: '' });
+        setShowOTPForm(false);
+        setOtpUserId(null);
+        setOtpCode('');
+      } else if (result.requiresVerification && result.userId) {
+        setOtpUserId(result.userId);
+        setOtpCode(result.otp || ''); // Use the OTP from the response for dev/testing
+        setShowOTPForm(true);
+        setError(''); // Clear any previous error
       } else {
         setError('Email ou mot de passe incorrect');
       }
-    } catch (err) {
+    } catch {
       setError('Erreur de connexion. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleClose = () => {
-    setFormData({ email: '', password: '' });
+  const handleOTPError = (message: string) => {
+    setError(message);
+  };
+
+  const handleOTPLoading = (loading: boolean) => {
+    setIsLoading(loading);
+  };
+
+  const handleOTPBack = () => {
+    setShowOTPForm(false);
+    setOtpUserId(null);
+    setOtpCode('');
     setError('');
-    setShowPassword(false);
+  };
+
+  const handleOTPClose = () => {
+    setShowOTPForm(false);
+    setOtpUserId(null);
+    setOtpCode('');
+    setError('');
     onClose();
+  };
+
+  const handleClose = () => {
+    if (showOTPForm) {
+      handleOTPBack();
+    } else {
+      setFormData({ email: '', password: '' });
+      setError('');
+      setShowPassword(false);
+      setShowOTPForm(false);
+      setOtpUserId(null);
+      setOtpCode('');
+      onClose();
+    }
   };
 
   // Comptes de démonstration
@@ -54,6 +97,28 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
   const fillDemoAccount = (account: typeof demoAccounts[0]) => {
     setFormData({ email: account.email, password: account.password });
   };
+
+  // If OTP form should be shown, render it instead of the login form
+  if (showOTPForm && otpUserId) {
+    return (
+      <Modal isOpen={isOpen} onClose={handleOTPClose} title="Vérification OTP" size="md">
+        <OTPForm
+          userId={otpUserId}
+          email={formData.email}
+          otp={otpCode}
+          onSuccess={() => {
+            onClose();
+            setShowOTPForm(false);
+            setOtpUserId(null);
+            setOtpCode('');
+          }}
+          onError={handleOTPError}
+          onLoading={handleOTPLoading}
+          onBack={handleOTPBack}
+        />
+      </Modal>
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Connexion Administrateur" size="md">

@@ -33,6 +33,7 @@
     29 => 'Termwind\\Laravel\\TermwindServiceProvider',
     30 => 'Phiki\\Adapters\\Laravel\\PhikiServiceProvider',
     31 => 'App\\Providers\\AppServiceProvider',
+    32 => 'Laravel\\Sanctum\\SanctumServiceProvider',
   ),
   'eager' => 
   array (
@@ -53,6 +54,7 @@
     14 => 'Termwind\\Laravel\\TermwindServiceProvider',
     15 => 'Phiki\\Adapters\\Laravel\\PhikiServiceProvider',
     16 => 'App\\Providers\\AppServiceProvider',
+    17 => 'Laravel\\Sanctum\\SanctumServiceProvider',
   ),
   'deferred' => 
   array (

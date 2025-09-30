@@ -167,39 +167,7 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* Statistiques */}
-      <section id="stats-section" className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">Notre Impact en Chiffres</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Découvrez comment nous transformons l'apprentissage et créons de nouvelles opportunités à travers l'Afrique.
-            </p>
-          </div>
-          <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 ${isVisible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-1000`}>
-            <AnimatedCounter 
-              end={5000} 
-              label="Apprenants formés" 
-              icon={<Users className="h-10 w-10 mx-auto" />} 
-            />
-            <AnimatedCounter 
-              end={50} 
-              label="Formations disponibles" 
-              icon={<BookOpen className="h-10 w-10 mx-auto" />} 
-            />
-            <AnimatedCounter 
-              end={95} 
-              label="Taux de satisfaction" 
-              icon={<Star className="h-10 w-10 mx-auto" />} 
-            />
-            <AnimatedCounter 
-              end={20} 
-              label="Pays représentés" 
-              icon={<Globe className="h-10 w-10 mx-auto" />} 
-            />
-          </div>
-        </div>
-      </section>
+   
 
       {/* Notre Approche */}
       <section className="py-16 bg-gray-50">
@@ -310,61 +278,6 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* Témoignages */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Ce Que Disent Nos Apprenants</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Découvrez les expériences transformatrices de ceux qui ont déjà rejoint la famille Empower Formation.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-2">
-              <div className="flex items-center text-yellow-500 mb-6">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} className="h-5 w-5 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-700 text-lg italic mb-6 leading-relaxed">
-                "Grâce à EMPOWER FORMATION, j'ai pu me reconvertir professionnellement en seulement 6 mois. 
-                La qualité des cours et le soutien de la communauté ont été déterminants dans ma réussite."
-              </p>
-              <div className="flex items-center">
-                <div className="w-16 h-16 bg-gray-200 rounded-full overflow-hidden mr-4">
-                  <img src="https://randomuser.me/api/portraits/women/45.jpg" alt="Avatar" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold">Aminata Diallo</h4>
-                  <p className="text-purple-600 font-medium">Développeuse Web, Dakar</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-2">
-              <div className="flex items-center text-yellow-500 mb-6">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} className="h-5 w-5 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-700 text-lg italic mb-6 leading-relaxed">
-                "Les cours sont très bien structurés et les formateurs sont toujours disponibles pour répondre aux questions. 
-                J'ai pu développer mes compétences et trouver un emploi rapidement."
-              </p>
-              <div className="flex items-center">
-                <div className="w-16 h-16 bg-gray-200 rounded-full overflow-hidden mr-4">
-                  <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Avatar" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold">Kofi Mensah</h4>
-                  <p className="text-purple-600 font-medium">Data Analyst, Accra</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Call to Action */}
       <section className="py-16 bg-gradient-to-r from-purple-600 to-pink-600">

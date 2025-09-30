@@ -66,7 +66,7 @@ const useApi = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}): Promise<any> => {
+  const apiCall = useCallback(async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
     setLoading(true);
     setError(null);
     
@@ -226,7 +226,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
     setSubmitError(null);
 
     try {
-      await apiCall('/registrations', {
+      await apiCall<{ message: string }>('/registrations', {
         method: 'POST',
         body: JSON.stringify({
           ...formData,
@@ -596,13 +596,13 @@ const InPersonTrainingCatalog: React.FC = () => {
   useEffect(() => {
     const loadFilterData = async () => {
       try {
-        const data = await apiCall('/trainings/filters/data');
+        const data = await apiCall<FilterData>('/courses/filters/data');
         setFilterData(data);
       } catch (err) {
         console.error('Erreur lors du chargement des filtres:', err);
       }
     };
-    
+
     loadFilterData();
   }, [apiCall]);
 
@@ -624,7 +624,7 @@ const InPersonTrainingCatalog: React.FC = () => {
   // Charger les formations
   const loadTrainings = useCallback(async () => {
     try {
-      const data: ApiResponse = await apiCall(`/trainings?${queryParams}`);
+      const data: ApiResponse = await apiCall<ApiResponse>(`/courses?${queryParams}`);
       setTrainings(data.data);
       setTotalPages(data.meta.last_page);
       setTotalResults(data.meta.total);

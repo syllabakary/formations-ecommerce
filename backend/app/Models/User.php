@@ -1,23 +1,17 @@
 <?php
+// app/Models/User.php
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -32,221 +26,67 @@ class User extends Authenticatable implements MustVerifyEmail
         'is_verified',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
+        'otp',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
         'otp_expires_at' => 'datetime',
         'is_verified' => 'boolean',
+        'password' => 'hashed',
     ];
 
     /**
-     * Les rôles disponibles
+     * Relations
      */
-    const ROLES = [
-        'Étudiant',
-        'Instructeur', 
-        'Admin'
-    ];
-
-    /**
-     * Les statuts disponibles
-     */
-    const STATUSES = [
-        'Actif',
-        'Inactif',
-        'Suspendu'
-    ];
-
-    /**
-     * Vérifier si l'utilisateur est un administrateur
-     */
-    public function isAdmin(): bool
+    public function courses()
     {
-        return $this->role === 'Admin';
+        return $this->hasMany(Course::class, 'trainer_id');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'user_id');
+    }
+
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class, 'user_id');
     }
 
     /**
-     * Vérifier si l'utilisateur est un instructeur
+     * Enrollments via email (not direct foreign key relationship)
      */
-    public function isInstructor(): bool
+    public function getEnrollmentsCount()
     {
-        return $this->role === 'Instructeur';
+        return CourseEnrollment::where('participant_email', $this->email)->count();
+    }
+
+    public function getCompletedEnrollmentsCount()
+    {
+        return CourseEnrollment::where('participant_email', $this->email)
+            ->where('progress_percentage', 100)
+            ->count();
     }
 
     /**
-     * Vérifier si l'utilisateur est un étudiant
-     */
-    public function isStudent(): bool
-    {
-        return $this->role === 'Étudiant';
-    }
-
-    /**
-     * Vérifier si le compte est actif
-     */
-    public function isActive(): bool
-    {
-        return $this->status === 'Actif';
-    }
-
-    /**
-     * Vérifier si le compte est suspendu
-     */
-    public function isSuspended(): bool
-    {
-        return $this->status === 'Suspendu';
-    }
-
-    /**
-     * Vérifier si l'email est vérifié
-     */
-    public function isEmailVerified(): bool
-    {
-        return !is_null($this->email_verified_at);
-    }
-
-    /**
-     * Marquer l'email comme vérifié
-     */
-    public function markEmailAsVerified(): bool
-    {
-        return $this->forceFill([
-            'email_verified_at' => $this->freshTimestamp(),
-        ])->save();
-    }
-
-    /**
-     * Obtenir l'avatar avec une URL par défaut
-     */
-    public function getAvatarAttribute($value): string
-    {
-        return $value ?: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150';
-    }
-
-    /**
-     * Scope pour filtrer par rôle
-     */
-    public function scopeByRole($query, string $role)
-    {
-        return $query->where('role', $role);
-    }
-
-    /**
-     * Scope pour filtrer par statut
-     */
-    public function scopeByStatus($query, string $status)
-    {
-        return $query->where('status', $status);
-    }
-
-    /**
-     * Scope pour les utilisateurs actifs
+     * Scopes
      */
     public function scopeActive($query)
     {
         return $query->where('status', 'Actif');
     }
 
-    /**
-     * Scope pour les utilisateurs vérifiés
-     */
+    public function scopeByRole($query, $role)
+    {
+        return $query->where('role', $role);
+    }
+
     public function scopeVerified($query)
     {
         return $query->whereNotNull('email_verified_at');
-    }
-
-    /**
-     * Scope pour recherche
-     */
-    public function scopeSearch($query, string $term)
-    {
-        return $query->where(function ($q) use ($term) {
-            $q->where('name', 'LIKE', "%{$term}%")
-              ->orWhere('email', 'LIKE', "%{$term}%");
-        });
-    }
-
-    /**
-     * Relation avec les OTP
-     */
-    public function otps()
-    {
-        return $this->hasMany(Otp::class, 'email', 'email');
-    }
-
-    /**
-     * Accesseur pour formater la date de création
-     */
-    public function getJoinDateAttribute(): string
-    {
-        return $this->created_at->format('Y-m-d');
-    }
-
-    /**
-     * Accesseur pour le nom complet formaté
-     */
-    public function getFormattedNameAttribute(): string
-    {
-        return ucwords(strtolower($this->name));
-    }
-
-    /**
-     * Mutateur pour le rôle - validation
-     */
-    public function setRoleAttribute($value): void
-    {
-        if (!in_array($value, self::ROLES)) {
-            throw new \InvalidArgumentException("Rôle invalide: {$value}");
-        }
-        $this->attributes['role'] = $value;
-    }
-
-    /**
-     * Mutateur pour le statut - validation
-     */
-    public function setStatusAttribute($value): void
-    {
-        if (!in_array($value, self::STATUSES)) {
-            throw new \InvalidArgumentException("Statut invalide: {$value}");
-        }
-        $this->attributes['status'] = $value;
-    }
-
-    /**
-     * Boot method pour définir les valeurs par défaut
-     */
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::creating(function ($user) {
-            if (!$user->role) {
-                $user->role = 'Étudiant';
-            }
-            if (!$user->status) {
-                $user->status = 'Actif';
-            }
-            if (!$user->avatar) {
-                $user->avatar = 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150';
-            }
-        });
     }
 }

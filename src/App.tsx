@@ -1,19 +1,21 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import Home from './pages/Home.tsx';
-import Catalog from './pages/Catalog.tsx';
-import Blog from './pages/Blog.tsx';
-import Login from './pages/Login.tsx';
-import Dashboard from './pages/Dashboard.tsx';
-import PaymentPage from './pages/paiement.tsx';
+import Home from './pages/Home';
+import Catalog from './pages/Catalog';
+import Blog from './pages/Blog';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import PaymentPage from './pages/paiement';
 import Footer from './components/Footer';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
-import Apropos from './pages/apropos.tsx';
-import Contact from './pages/Contacts.tsx';
-import Presentiel from './pages/Presentiel.tsx';
-import Catalog2 from './pages/Catalog2.tsx';
+import Apropos from './pages/Apropos';
+import Contact from './pages/Contacts';
+import Presentiel from './pages/presentiel';
+import Catalog2 from './pages/Catalog2';
+import Settings from './pages/Settings';
+import Chat from './components/Chat';
 
 function App() {
   return (
@@ -34,6 +36,8 @@ function App() {
                 <Route path="/contacts" element={<Contact />} />
                 <Route path="/presentiel" element={<Presentiel />} />
                 <Route path="/catalog2" element={<Catalog2 />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/chat" element={<Chat />} />
               </Routes>
             </div>
             <Footer />

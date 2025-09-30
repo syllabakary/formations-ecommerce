@@ -1,239 +1,184 @@
-import { useState, useEffect, useCallback } from 'react';
-import apiService from '../services/apiService';
-import { User, UserStats, UserFilters, CreateUserData, UpdateUserData } from '../types/api';
+// hooks/useAdmin.ts - Version corrigée
 
-interface UseAdminReturn {
-  // États
-  users: User[];
-  stats: UserStats | null;
-  isLoading: boolean;
-  error: string | null;
-  currentPage: number;
-  totalPages: number;
-  isSubmitting: boolean;
+import { useState, useCallback } from 'react';
+import { apiService } from '../services/apiService';
+import { User, UserFilters, UserStats } from '../types/api';
 
-  // Actions
-  loadUsers: (filters?: UserFilters) => Promise<void>;
-  createUser: (userData: CreateUserData) => Promise<{ success: boolean; message?: string }>;
-  updateUser: (id: number, userData: UpdateUserData) => Promise<{ success: boolean; message?: string }>;
-  deleteUser: (id: number) => Promise<{ success: boolean; message?: string }>;
-  updateUserStatus: (id: number, status: 'Actif' | 'Inactif' | 'Suspendu') => Promise<{ success: boolean; message?: string }>;
-  bulkDeleteUsers: (userIds: number[]) => Promise<{ success: boolean; message?: string }>;
-  resetUserPassword: (id: number, newPassword: string) => Promise<{ success: boolean; message?: string }>;
-  setCurrentPage: (page: number) => void;
-  clearError: () => void;
+interface PaginationData {
+  current_page: number;
+  last_page: number;
+  total: number;
+  per_page: number;
 }
 
-export const useAdmin = (): UseAdminReturn => {
-  // Get token from localStorage directly
-  const getToken = () => localStorage.getItem('auth_token');
-
-  // États
+export const useAdmin = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Configurer le token dans le service API
-  useEffect(() => {
-    const token = getToken();
-    if (token) {
-      apiService.setToken(token);
-    }
-  }, []);
-
-  // Charger les utilisateurs
   const loadUsers = useCallback(async (filters: UserFilters = {}) => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsLoading(true);
-      setError(null);
-
-      const token = getToken();
-      if (!token) {
-        setError('Token d\'authentification manquant');
-        setIsLoading(false);
-        return;
-      }
-
-      const filtersWithPage = {
+      const params = {
         page: currentPage,
         per_page: 15,
-        ...filters,
+        ...filters
       };
 
-      const response = await apiService.getUsers(filtersWithPage);
+      const response = await apiService.getUsers(params);
+      
+      console.log('📊 Réponse API Users:', response);
 
       if (response.success && response.data) {
-        setUsers(response.data);
-        setStats(response.stats);
+        // ✅ CORRECTION : Accéder correctement aux données imbriquées
+        const usersData = response.data.data || response.data;
+        const paginationData = response.data;
 
-        if (response.pagination) {
-          setTotalPages(response.pagination.last_page);
+        // Vérifier que usersData est un tableau
+        if (Array.isArray(usersData)) {
+          setUsers(usersData);
+        } else {
+          console.error('❌ usersData n\'est pas un tableau:', usersData);
+          setUsers([]);
+          setError('Format de données invalide reçu de l\'API');
+        }
+
+        // Mettre à jour la pagination
+        if (paginationData.current_page) {
+          setCurrentPage(paginationData.current_page);
+          setTotalPages(paginationData.last_page || 1);
+        }
+
+        // Charger les stats si elles ne sont pas déjà chargées
+        if (!stats) {
+          loadStats();
         }
       } else {
         setError(response.message || 'Erreur lors du chargement des utilisateurs');
+        setUsers([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des utilisateurs');
+      console.error('❌ Erreur loadUsers:', err);
+      setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage]);
+  }, [currentPage, stats]);
 
-  // Créer un utilisateur
-  const createUser = useCallback(async (userData: CreateUserData) => {
+  const loadStats = useCallback(async () => {
     try {
-      setIsSubmitting(true);
-
-      const response = await apiService.createUser(userData);
-
-      if (response.success) {
-        await loadUsers(); // Recharger la liste
-        return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message || 'Erreur lors de la création' };
+      const response = await apiService.request('/admin/stats');
+      
+      if (response.success && response.data) {
+        setStats(response.data);
       }
     } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Erreur lors de la création'
-      };
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadUsers]);
-
-  // Mettre à jour un utilisateur
-  const updateUser = useCallback(async (id: number, userData: UpdateUserData) => {
-    try {
-      setIsSubmitting(true);
-
-      const response = await apiService.updateUser(id, userData);
-
-      if (response.success) {
-        await loadUsers(); // Recharger la liste
-        return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message || 'Erreur lors de la mise à jour' };
-      }
-    } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Erreur lors de la mise à jour'
-      };
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadUsers]);
-
-  // Supprimer un utilisateur
-  const deleteUser = useCallback(async (id: number) => {
-    try {
-      setIsSubmitting(true);
-
-      const response = await apiService.deleteUser(id);
-
-      if (response.success) {
-        await loadUsers(); // Recharger la liste
-        return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message || 'Erreur lors de la suppression' };
-      }
-    } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Erreur lors de la suppression'
-      };
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadUsers]);
-
-  // Mettre à jour le statut d'un utilisateur
-  const updateUserStatus = useCallback(async (id: number, status: 'Actif' | 'Inactif' | 'Suspendu') => {
-    try {
-      setIsSubmitting(true);
-
-      const response = await apiService.updateUserStatus(id, status);
-
-      if (response.success) {
-        await loadUsers(); // Recharger la liste
-        return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message || 'Erreur lors de la mise à jour du statut' };
-      }
-    } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Erreur lors de la mise à jour du statut'
-      };
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadUsers]);
-
-  // Supprimer plusieurs utilisateurs
-  const bulkDeleteUsers = useCallback(async (userIds: number[]) => {
-    try {
-      setIsSubmitting(true);
-
-      const response = await apiService.bulkDeleteUsers(userIds);
-
-      if (response.success) {
-        await loadUsers(); // Recharger la liste
-        return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message || 'Erreur lors de la suppression multiple' };
-      }
-    } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Erreur lors de la suppression multiple'
-      };
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadUsers]);
-
-  // Réinitialiser le mot de passe d'un utilisateur
-  const resetUserPassword = useCallback(async (id: number, newPassword: string) => {
-    try {
-      setIsSubmitting(true);
-
-      const response = await apiService.resetUserPassword(id, newPassword);
-
-      if (response.success) {
-        return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message || 'Erreur lors de la réinitialisation' };
-      }
-    } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Erreur lors de la réinitialisation'
-      };
-    } finally {
-      setIsSubmitting(false);
+      console.error('Erreur chargement stats:', err);
     }
   }, []);
 
-  // Effacer l'erreur
+  const createUser = useCallback(async (userData: any) => {
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.createUser(userData);
+      
+      if (response.success) {
+        await loadUsers();
+        return { success: true, message: 'Utilisateur créé avec succès' };
+      } else {
+        setError(response.message || 'Erreur lors de la création');
+        return { success: false, message: response.message };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la création';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadUsers]);
+
+  const updateUser = useCallback(async (id: number, userData: any) => {
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.updateUser(id, userData);
+      
+      if (response.success) {
+        await loadUsers();
+        return { success: true, message: 'Utilisateur mis à jour avec succès' };
+      } else {
+        setError(response.message || 'Erreur lors de la mise à jour');
+        return { success: false, message: response.message };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la mise à jour';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadUsers]);
+
+  const deleteUser = useCallback(async (id: number) => {
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.deleteUser(id);
+      
+      if (response.success) {
+        await loadUsers();
+        return { success: true, message: 'Utilisateur supprimé avec succès' };
+      } else {
+        setError(response.message || 'Erreur lors de la suppression');
+        return { success: false, message: response.message };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la suppression';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadUsers]);
+
+  const updateUserStatus = useCallback(async (id: number, status: string) => {
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.updateUserStatus(id, status);
+      
+      if (response.success) {
+        await loadUsers();
+        return { success: true, message: 'Statut mis à jour avec succès' };
+      } else {
+        setError(response.message || 'Erreur lors de la mise à jour du statut');
+        return { success: false, message: response.message };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la mise à jour du statut';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadUsers]);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
-
-  // Charger les utilisateurs au montage du composant
-  useEffect(() => {
-    const token = getToken();
-    if (token) {
-      loadUsers();
-    } else {
-      setIsLoading(false);
-    }
-  }, [loadUsers]);
 
   return {
     users,
@@ -248,11 +193,7 @@ export const useAdmin = (): UseAdminReturn => {
     updateUser,
     deleteUser,
     updateUserStatus,
-    bulkDeleteUsers,
-    resetUserPassword,
     setCurrentPage,
     clearError,
   };
 };
-
-export default useAdmin;

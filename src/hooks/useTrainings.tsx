@@ -35,7 +35,7 @@ export const useTrainings = (initialFilters = {}) => {
     });
 
     try {
-      const data = await apiCall(`/trainings?${queryParams.toString()}`);
+      const data = await apiCall(`/courses?${queryParams.toString()}`);
       
       if (resetPage || filters.page === 1) {
         setTrainings(data.data);

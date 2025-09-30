@@ -1,84 +1,186 @@
-// utils/api.js
+// utils/api.ts
 export const API_ENDPOINTS = {
-  TRAININGS: '/trainings',
-  TRAINING_DETAIL: (id) => `/trainings/${id}`,
-  TRAINING_FILTERS: '/trainings/filters/data',
+  TRAININGS: '/courses',
+  TRAINING_DETAIL: (id: string | number) => `/courses/${id}`,
+  TRAINING_FILTERS: '/courses/filters/data',
   REGISTRATIONS: '/registrations',
-  CHECK_AVAILABILITY: (id) => `/trainings/${id}/availability`,
+  CHECK_AVAILABILITY: (id: string | number) => `/courses/${id}/availability`,
   DASHBOARD_STATS: '/dashboard/stats',
   POPULAR_TRAININGS: '/dashboard/popular-trainings'
 };
 
-export const apiService = {
-  // Formations
-  getTrainings: async (params) => {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/trainings?${queryString}`);
-    return response.json();
-  },
+// Enhanced fetch with timeout and AbortController
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs: number = 10000): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  getTrainingDetail: async (id) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/trainings/${id}`);
-    return response.json();
-  },
-
-  getFiltersData: async () => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/trainings/filters/data`);
-    return response.json();
-  },
-
-  // Inscriptions
-  createRegistration: async (data) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/registrations`, {
-      method: 'POST',
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
       },
-      body: JSON.stringify(data)
     });
-    return response.json();
-  },
-
-  checkAvailability: async (trainingId) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/trainings/${trainingId}/availability`);
-    return response.json();
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - please try again');
+    }
+    throw error;
   }
 };
 
-// utils/helpers.js
-export const formatPrice = (price) => {
+export const apiService = {
+  // Formations
+  getTrainings: async (params: Record<string, string | number | boolean>) => {
+    try {
+      const queryString = new URLSearchParams(
+        Object.entries(params).map(([key, value]) => [key, String(value)])
+      ).toString();
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses?${queryString}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching trainings:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch trainings');
+    }
+  },
+
+  getTrainingDetail: async (id: number) => {
+    try {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses/${id}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching training detail:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch training detail');
+    }
+  },
+
+  getFiltersData: async () => {
+    try {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses/filters/data`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching filters data:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch filters data');
+    }
+  },
+
+  // Favorites
+  getFavorites: async (email: string) => {
+    try {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/favorites?email=${encodeURIComponent(email)}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch favorites');
+    }
+  },
+
+  toggleFavorite: async (email: string, type: 'course' | 'training', id: number) => {
+    try {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/favorites/toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, type, id }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      throw error instanceof Error ? error : new Error('Failed to toggle favorite');
+    }
+  },
+
+  // Inscriptions
+  createRegistration: async (data: Record<string, unknown>) => {
+    try {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/registrations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating registration:', error);
+      throw error instanceof Error ? error : new Error('Failed to create registration');
+    }
+  },
+
+  checkAvailability: async (trainingId: number) => {
+    try {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses/${trainingId}/availability`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error checking availability:', error);
+      throw error instanceof Error ? error : new Error('Failed to check availability');
+    }
+  }
+};
+
+// utils/helpers.ts
+export const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('fr-FR').format(price) + ' F';
 };
 
-export const formatDate = (dateString) => {
-  const options = { 
-    weekday: 'long', 
-    day: 'numeric', 
-    month: 'long', 
-    year: 'numeric' 
+export const formatDate = (dateString: string): string => {
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
   };
   return new Date(dateString).toLocaleDateString('fr-FR', options);
 };
 
-export const formatDateShort = (dateString) => {
-  const options = { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
+export const formatDateShort = (dateString: string): string => {
+  const options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
   };
   return new Date(dateString).toLocaleDateString('fr-FR', options);
 };
 
-export const getTimeRemaining = (dateString) => {
+export const getTimeRemaining = (dateString: string): string | null => {
   const now = new Date();
   const targetDate = new Date(dateString);
-  const diff = targetDate - now;
-  
+  const diff = targetDate.getTime() - now.getTime();
+
   if (diff < 0) return null;
-  
+
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  
+
   if (days > 0) {
     return `Dans ${days} jour${days > 1 ? 's' : ''}`;
   } else if (hours > 0) {
@@ -88,12 +190,12 @@ export const getTimeRemaining = (dateString) => {
   }
 };
 
-export const truncateText = (text, maxLength = 100) => {
+export const truncateText = (text: string, maxLength: number = 100): string => {
   if (text.length <= maxLength) return text;
   return text.substr(0, maxLength) + '...';
 };
 
-export const generateSlug = (text) => {
+export const generateSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -103,12 +205,12 @@ export const generateSlug = (text) => {
     .replace(/^-|-$/g, '');
 };
 
-export const validateEmail = (email) => {
+export const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
 };
 
-export const validatePhone = (phone) => {
-  const re = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+export const validatePhone = (phone: string): boolean => {
+  const re = /^[+]?[0-9\s\-()]{10,}$/;
   return re.test(phone);
 };

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useAuth } from './AuthProvider';
-import LoginModal from './LoginModal';
+// ProtectedRoute.tsx
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,46 +10,43 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requiredRole = 'admin' 
+  requiredRole 
 }) => {
-  const { isAuthenticated, user, login } = useAuth();
-  const [showLoginModal, setShowLoginModal] = useState(!isAuthenticated);
+  const { isAuthenticated, user, isLoading } = useAuth();
+  const location = useLocation();
 
-  // Si l'utilisateur n'est pas connecté, afficher le modal de connexion
-  if (!isAuthenticated) {
+  // Afficher un loader pendant la vérification de l'authentification
+  if (isLoading) {
     return (
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLogin={async (credentials) => {
-          const success = await login(credentials);
-          if (success) {
-            setShowLoginModal(false);
-          }
-          return success;
-        }}
-      />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A553C4] mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification de l'authentification...</p>
+        </div>
+      </div>
     );
   }
 
-  // Vérifier les permissions de rôle
-  if (requiredRole && user?.role !== requiredRole && user?.role !== 'admin') {
+  // Rediriger vers login si non authentifié
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Vérifier le rôle si requis
+  if (requiredRole && user.role !== requiredRole) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Accès Refusé</h2>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Accès refusé</h2>
           <p className="text-gray-600 mb-4">
-            Vous n'avez pas les permissions nécessaires pour accéder à cette section.
+            Vous n'avez pas les permissions nécessaires pour accéder à cette page.
           </p>
-          <p className="text-sm text-gray-500">
-            Rôle requis: <span className="font-medium">{requiredRole}</span><br />
-            Votre rôle: <span className="font-medium">{user?.role}</span>
-          </p>
+          <button 
+            onClick={() => window.history.back()}
+            className="bg-[#A553C4] text-white px-4 py-2 rounded-lg hover:bg-[#6636DD]"
+          >
+            Retour
+          </button>
         </div>
       </div>
     );

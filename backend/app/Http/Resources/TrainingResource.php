@@ -14,21 +14,31 @@ class TrainingResource extends JsonResource
             'slug' => $this->slug,
             'short_description' => $this->short_description,
             'category' => [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
-                'slug' => $this->category->slug
+                'id' => optional($this->category)->id,
+                'name' => optional($this->category)->name ?? '',
+                'slug' => optional($this->category)->slug ?? ''
             ],
             'city' => [
-                'id' => $this->city->id,
-                'name' => $this->city->name
+                'id' => optional($this->city)->id,
+                'name' => optional($this->city)->name ?? ''
             ],
-            'trainer' => [
-                'id' => $this->trainer->id,
-                'name' => $this->trainer->name,
-                'bio' => $this->trainer->bio,
-                'rating' => $this->trainer->rating,
-                'avatar_url' => $this->trainer->avatar_url
-            ],
+            'trainer' => $this->when(
+                $this->relationLoaded('trainer') && $this->trainer,
+                function () {
+                    return [
+                        'id' => $this->trainer->id,
+                        'name' => $this->trainer->name,
+                        'bio' => $this->trainer->bio,
+                        'rating' => $this->trainer->rating,
+                        'avatar_url' => $this->trainer->avatar_url
+                    ];
+                },
+                [
+                    'id' => $this->trainer_id ?? null,
+                    'name' => $this->trainer_name ?? 'Formateur non spécifié'
+                ]
+            ),
+            'trainer_name' => $this->trainer_name ?? (optional($this->trainer)->name ?? 'Non spécifié'),
             'start_date' => $this->start_date->format('Y-m-d'),
             'end_date' => $this->end_date->format('Y-m-d'),
             'start_time' => $this->start_time?->format('H:i'),

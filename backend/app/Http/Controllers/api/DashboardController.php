@@ -70,8 +70,8 @@ class DashboardController extends Controller
                     return [
                         'id' => $training->id,
                         'title' => $training->title,
-                        'category' => $training->category->name,
-                        'city' => $training->city->name,
+                        'category' => optional($training->category)->name ?? '',
+                        'city' => optional($training->city)->name ?? '',
                         'price' => $training->formatted_price,
                         'rating' => $training->rating,
                         'registered_count' => $training->registered_count,

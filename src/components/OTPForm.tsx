@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, ArrowLeft } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface OTPFormProps {
   userId: number;

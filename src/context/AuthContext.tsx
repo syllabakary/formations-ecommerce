@@ -16,6 +16,7 @@ interface AuthResponse {
   user?: User;
   user_id?: number;
   otp?: string;
+  requires_verification?: boolean;
 }
 
 interface AuthContextType {
@@ -32,7 +33,7 @@ interface AuthContextType {
 }
 
 // Contexte
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Hook pour utiliser le contexte
 export const useAuth = (): AuthContextType => {
@@ -42,6 +43,8 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+
 
 // Configuration API
 const API_BASE_URL = 'http://localhost:8000/api'; // Ajuste selon ton backend
@@ -89,6 +92,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
   };
 
+  // Obtenir le cookie CSRF (nécessaire pour Sanctum)
+  const getCsrfCookie = async (): Promise<void> => {
+    try {
+      await axios.get(`${API_BASE_URL.replace('/api', '')}/sanctum/csrf-cookie`, {
+        withCredentials: true
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'obtention du cookie CSRF:', error);
+    }
+  };
+
   // Fonction générique pour les appels API
   const apiCall = async (endpoint: string, data: Record<string, unknown>): Promise<AuthResponse> => {
     try {
@@ -97,7 +111,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` })
-        }
+        },
+        withCredentials: true, // Important pour Sanctum (cookies de session)
+        validateStatus: () => true // Accepter tous les codes de statut
       };
 
       const response = await axios.post(`${API_BASE_URL}${endpoint}`, data, config);
@@ -113,12 +129,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Connexion
   const login = async (email: string, password: string): Promise<AuthResponse> => {
+    console.log(`🔑 Tentative de connexion pour: ${email}`);
+
+    // Obtenir le cookie CSRF d'abord
+    await getCsrfCookie();
+
     const response = await apiCall('/login', { email, password });
-    
+
     if (response.success && response.token && response.user) {
       saveAuth(response.token, response.user);
+    } else if (response.requires_verification) {
+      console.log(`📱 Vérification OTP requise pour: ${email}`);
     }
-    
+
     return response;
   };
 

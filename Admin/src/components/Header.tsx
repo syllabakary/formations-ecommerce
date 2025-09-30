@@ -1,7 +1,7 @@
 import React from 'react';
-import { Search, Bell, User, Menu, LogOut } from 'lucide-react';
+import { Search, User, Menu, LogOut } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
-import { useAuth } from './AuthProvider';
+import { useAuth } from '../context/AuthProvider';
 
 interface HeaderProps {
   setSidebarOpen: (open: boolean) => void;
@@ -63,10 +63,6 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
                   <p className="text-sm text-gray-500">{user?.email}</p>
                 </div>
                 <div className="p-2">
-                  <button className="w-full flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
-                    <User className="w-4 h-4" />
-                    <span>Mon Profil</span>
-                  </button>
                   <button 
                     onClick={logout}
                     className="w-full flex items-center space-x-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"

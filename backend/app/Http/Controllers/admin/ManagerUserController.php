@@ -1,6 +1,7 @@
 <?php
+// app/Http/Controllers/Admin/ManagerUserController.php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -8,135 +9,28 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 
 class ManagerUserController extends Controller
 {
     /**
-     * Constructeur - Middleware pour vérifier que l'utilisateur est admin
+     * Obtenir un utilisateur par ID
      */
-    public function __construct()
-    {
-        $this->middleware(['auth:sanctum', 'admin']);
-    }
-
-    /**
-     * Liste tous les utilisateurs avec pagination et filtres
-     */
-    public function getUsers(Request $request): JsonResponse
+    public function getUserById($id): JsonResponse
     {
         try {
-            $query = User::query();
-
-            // Recherche par nom ou email
-            if ($request->filled('search')) {
-                $search = $request->input('search');
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'LIKE', "%{$search}%")
-                      ->orWhere('email', 'LIKE', "%{$search}%");
-                });
-            }
-
-            // Filtre par rôle
-            if ($request->filled('role') && $request->input('role') !== 'all') {
-                $query->where('role', $request->input('role'));
-            }
-
-            // Filtre par statut
-            if ($request->filled('status') && $request->input('status') !== 'all') {
-                $query->where('status', $request->input('status'));
-            }
-
-            // Tri
-            $sortBy = $request->input('sort_by', 'created_at');
-            $sortOrder = $request->input('sort_order', 'desc');
-            $query->orderBy($sortBy, $sortOrder);
-
-            // Pagination
-            $perPage = $request->input('per_page', 15);
-            $users = $query->paginate($perPage);
-
-            // Ajouter des statistiques supplémentaires
-            $users->getCollection()->transform(function ($user) {
-                $user->courses_enrolled = $user->role === 'Étudiant' ? rand(0, 5) : 0;
-                $user->courses_completed = $user->role === 'Étudiant' ? rand(0, $user->courses_enrolled) : 0;
-                $user->courses_created = $user->role === 'Instructeur' ? rand(0, 3) : 0;
-                $user->last_active = $this->getRandomLastActive();
-                $user->join_date = $user->created_at->format('Y-m-d');
-                return $user;
-            });
+            $user = User::findOrFail($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $users->items(),
-                'pagination' => [
-                    'current_page' => $users->currentPage(),
-                    'last_page' => $users->lastPage(),
-                    'per_page' => $users->perPage(),
-                    'total' => $users->total(),
-                ],
-                'stats' => $this->getUserStats()
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la récupération des utilisateurs: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Créer un nouvel utilisateur
-     */
-    public function createUser(Request $request): JsonResponse
-    {
-        try {
-            // Validation
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email',
-                'phone' => 'required|string|unique:users,phone',
-                'role' => 'required|in:Étudiant,Instructeur,Admin',
-                'password' => 'required|string|min:6',
-                'status' => 'required|in:Actif,Inactif,Suspendu',
-                'avatar' => 'nullable|url',
-                'join_date' => 'nullable|date'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Données invalides',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Créer l'utilisateur
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'role' => $request->role,
-                'password' => Hash::make($request->password),
-                'status' => $request->status,
-                'avatar' => $request->avatar ?: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150',
-                'email_verified_at' => Carbon::now(), // Auto-vérifier pour les admins
-                'created_at' => $request->join_date ? Carbon::parse($request->join_date) : Carbon::now()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Utilisateur créé avec succès',
                 'data' => $user
-            ], 201);
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Utilisateur non trouvé'
+            ], 404);
         }
     }
 
@@ -148,36 +42,31 @@ class ManagerUserController extends Controller
         try {
             $user = User::findOrFail($id);
 
-            // Validation
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email,' . $id,
-                'phone' => 'required|string|unique:users,phone,' . $id,
+                'email' => ['required', 'email', Rule::unique('users')->ignore($id)],
+                'phone' => ['required', 'string', Rule::unique('users')->ignore($id)],
                 'role' => 'required|in:Étudiant,Instructeur,Admin',
-                'status' => 'required|in:Actif,Inactif,Suspendu',
-                'avatar' => 'nullable|url',
-                'password' => 'nullable|string|min:6'
+                'status' => 'nullable|in:Actif,Inactif,Suspendu',
+                'password' => 'nullable|string|min:6',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Données invalides',
+                    'message' => 'Erreur de validation',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            // Mise à jour des données
             $updateData = [
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
                 'role' => $request->role,
-                'status' => $request->status,
-                'avatar' => $request->avatar ?: $user->avatar
+                'status' => $request->status ?? $user->status,
             ];
 
-            // Mettre à jour le mot de passe seulement si fourni
             if ($request->filled('password')) {
                 $updateData['password'] = Hash::make($request->password);
             }
@@ -187,8 +76,8 @@ class ManagerUserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Utilisateur mis à jour avec succès',
-                'data' => $user->fresh()
-            ], 200);
+                'data' => $user
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -219,7 +108,7 @@ class ManagerUserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Utilisateur supprimé avec succès'
-            ], 200);
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -230,35 +119,43 @@ class ManagerUserController extends Controller
     }
 
     /**
-     * Obtenir les détails d'un utilisateur
+     * Suppression en masse
      */
-    public function getUserById($id): JsonResponse
+    public function bulkDeleteUsers(Request $request): JsonResponse
     {
         try {
-            $user = User::findOrFail($id);
+            $validator = Validator::make($request->all(), [
+                'user_ids' => 'required|array',
+                'user_ids.*' => 'exists:users,id'
+            ]);
 
-            // Ajouter des stats personnalisées
-            $user->courses_enrolled = $user->role === 'Étudiant' ? rand(0, 5) : 0;
-            $user->courses_completed = $user->role === 'Étudiant' ? rand(0, $user->courses_enrolled) : 0;
-            $user->courses_created = $user->role === 'Instructeur' ? rand(0, 3) : 0;
-            $user->last_active = $this->getRandomLastActive();
-            $user->join_date = $user->created_at->format('Y-m-d');
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Empêcher la suppression de son propre compte
+            $userIds = array_diff($request->user_ids, [auth()->id()]);
+
+            User::whereIn('id', $userIds)->delete();
 
             return response()->json([
                 'success' => true,
-                'data' => $user
-            ], 200);
+                'message' => count($userIds) . ' utilisateur(s) supprimé(s)'
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Utilisateur non trouvé: ' . $e->getMessage()
-            ], 404);
+                'message' => 'Erreur lors de la suppression en masse'
+            ], 500);
         }
     }
 
     /**
-     * Suspendre ou réactiver un utilisateur
+     * Changer le statut d'un utilisateur
      */
     public function toggleUserStatus(Request $request, $id): JsonResponse
     {
@@ -272,7 +169,6 @@ class ManagerUserController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Statut invalide',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -281,20 +177,20 @@ class ManagerUserController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Statut de l'utilisateur mis à jour: {$request->status}",
-                'data' => $user->fresh()
-            ], 200);
+                'message' => 'Statut mis à jour avec succès',
+                'data' => $user
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la mise à jour du statut: ' . $e->getMessage()
+                'message' => 'Erreur lors de la mise à jour du statut'
             ], 500);
         }
     }
 
     /**
-     * Réinitialiser le mot de passe d'un utilisateur
+     * Réinitialiser le mot de passe
      */
     public function resetUserPassword(Request $request, $id): JsonResponse
     {
@@ -302,13 +198,13 @@ class ManagerUserController extends Controller
             $user = User::findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'new_password' => 'required|string|min:6|confirmed'
+                'new_password' => 'required|string|min:6',
+                'new_password_confirmation' => 'required|same:new_password'
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Mot de passe invalide',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -317,140 +213,166 @@ class ManagerUserController extends Controller
                 'password' => Hash::make($request->new_password)
             ]);
 
-            // Optionnel: Révoquer tous les tokens de l'utilisateur
-            $user->tokens()->delete();
-
             return response()->json([
                 'success' => true,
                 'message' => 'Mot de passe réinitialisé avec succès'
-            ], 200);
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la réinitialisation: ' . $e->getMessage()
+                'message' => 'Erreur lors de la réinitialisation du mot de passe'
             ], 500);
         }
     }
 
     /**
-     * Supprimer plusieurs utilisateurs
+     * Liste des utilisateurs avec pagination et filtres
      */
-    public function bulkDeleteUsers(Request $request): JsonResponse
+    public function getUsers(Request $request): JsonResponse
+    {
+        try {
+            $perPage = $request->input('per_page', 10);
+            $search = $request->input('search');
+            $role = $request->input('role');
+            $status = $request->input('status');
+
+            $query = User::query();
+
+            // Recherche
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'LIKE', "%{$search}%")
+                      ->orWhere('email', 'LIKE', "%{$search}%")
+                      ->orWhere('phone', 'LIKE', "%{$search}%");
+                });
+            }
+
+            // Filtre par rôle
+            if ($role && $role !== 'all') {
+                $query->where('role', $role);
+            }
+
+            // Filtre par statut
+            if ($status && $status !== 'all') {
+                $query->where('status', $status);
+            }
+
+            $users = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            // ✅ Transformer les données pour assurer la compatibilité
+            $usersData = $users->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name ?? 'Sans nom',
+                    'email' => $user->email,
+                    'phone' => $user->phone ?? 'Non renseigné',
+                    'role' => $user->role ?? 'Étudiant',
+                    'status' => $user->status ?? 'Actif',
+                    'avatar' => $user->avatar ?? 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150',
+                    'is_verified' => (bool) ($user->email_verified_at !== null),
+                    'join_date' => $user->created_at->format('Y-m-d'),
+                    'last_active' => $user->updated_at->diffForHumans(),
+                    'courses_enrolled' => $user->getEnrollmentsCount(),
+                    'courses_completed' => $user->getCompletedEnrollmentsCount(),
+                    'courses_created' => $user->role === 'Instructeur' ? ($user->courses()->count() ?? 0) : null,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'data' => $usersData,
+                    'current_page' => $users->currentPage(),
+                    'last_page' => $users->lastPage(),
+                    'per_page' => $users->perPage(),
+                    'total' => $users->total(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur getUsers: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du chargement des utilisateurs: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Stats du dashboard
+     */
+    public function getDashboardStats(): JsonResponse
+    {
+        try {
+            $total = User::count();
+            $students = User::where('role', 'Étudiant')->count();
+            $instructors = User::where('role', 'Instructeur')->count();
+            $active = User::where('status', 'Actif')->count();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total' => $total,
+                    'students' => $students,
+                    'instructors' => $instructors,
+                    'active' => $active,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du chargement des statistiques'
+            ], 500);
+        }
+    }
+
+    /**
+     * Créer un utilisateur
+     */
+    public function createUser(Request $request): JsonResponse
     {
         try {
             $validator = Validator::make($request->all(), [
-                'user_ids' => 'required|array|min:1',
-                'user_ids.*' => 'exists:users,id'
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'phone' => 'required|string|unique:users,phone',
+                'password' => 'required|string|min:6',
+                'role' => 'required|in:Étudiant,Instructeur,Admin',
+                'status' => 'nullable|in:Actif,Inactif,Suspendu',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'IDs utilisateurs invalides',
+                    'message' => 'Erreur de validation',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            $userIds = $request->user_ids;
-
-            // Empêcher la suppression de son propre compte
-            if (in_array(auth()->id(), $userIds)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Vous ne pouvez pas supprimer votre propre compte'
-                ], 403);
-            }
-
-            $deletedCount = User::whereIn('id', $userIds)->delete();
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'role' => $request->role,
+                'status' => $request->status ?? 'Actif',
+                'email_verified_at' => now(), // Auto-vérifié pour admin
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => "{$deletedCount} utilisateurs supprimés avec succès"
-            ], 200);
+                'message' => 'Utilisateur créé avec succès',
+                'data' => $user
+            ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la suppression: ' . $e->getMessage()
+                'message' => 'Erreur lors de la création: ' . $e->getMessage()
             ], 500);
         }
-    }
-
-    /**
-     * Obtenir les statistiques des utilisateurs
-     */
-    public function getDashboardStats(): JsonResponse
-    {
-        try {
-            $stats = [
-                'total_users' => User::count(),
-                'active_users' => User::where('status', 'Actif')->count(),
-                'students' => User::where('role', 'Étudiant')->count(),
-                'instructors' => User::where('role', 'Instructeur')->count(),
-                'admins' => User::where('role', 'Admin')->count(),
-                'verified_users' => User::whereNotNull('email_verified_at')->count(),
-                'new_users_this_month' => User::whereMonth('created_at', Carbon::now()->month)->count(),
-                'inactive_users' => User::where('status', 'Inactif')->count(),
-                'suspended_users' => User::where('status', 'Suspendu')->count(),
-            ];
-
-            // Statistiques par mois pour les graphiques
-            $monthlyStats = [];
-            for ($i = 11; $i >= 0; $i--) {
-                $date = Carbon::now()->subMonths($i);
-                $monthlyStats[] = [
-                    'month' => $date->format('M Y'),
-                    'users' => User::whereYear('created_at', $date->year)
-                                  ->whereMonth('created_at', $date->month)
-                                  ->count()
-                ];
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'overview' => $stats,
-                    'monthly_registrations' => $monthlyStats
-                ]
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la récupération des statistiques: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Méthodes privées
-     */
-    private function getUserStats(): array
-    {
-        return [
-            'total' => User::count(),
-            'students' => User::where('role', 'Étudiant')->count(),
-            'instructors' => User::where('role', 'Instructeur')->count(),
-            'admins' => User::where('role', 'Admin')->count(),
-            'active' => User::where('status', 'Actif')->count(),
-            'inactive' => User::where('status', 'Inactif')->count(),
-            'suspended' => User::where('status', 'Suspendu')->count(),
-        ];
-    }
-
-    private function getRandomLastActive(): string
-    {
-        $options = [
-            'Il y a quelques instants',
-            'Il y a 5 minutes',
-            'Il y a 1 heure',
-            'Il y a 3 heures',
-            'Hier',
-            'Il y a 2 jours',
-            'Il y a 1 semaine'
-        ];
-
-        return $options[array_rand($options)];
     }
 }

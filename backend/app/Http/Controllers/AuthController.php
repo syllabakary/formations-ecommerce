@@ -106,7 +106,9 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Votre compte n\'est pas vérifié. Un code OTP a été envoyé à votre email.',
-                    'requires_verification' => true
+                    'requires_verification' => true,
+                    'user_id' => $user->id,
+                    'otp' => $otpCode // Pour dev/test uniquement
                 ], 403);
             }
 

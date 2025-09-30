@@ -1,696 +1,940 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  MapPin,
+  Calendar,
+  Clock,
+  Users,
+  Star,
+  ArrowRight,
+  Filter,
+  X,
+  Search,
+  Loader2,
+  AlertCircle,
+  Check,
+  Heart,
+  Share2,
+  BarChart3
+} from 'lucide-react';
 
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, Star, Clock, Users, Play, BookOpen,
-   Award, TrendingUp, Code,
-  Shield, Database, Palette, 
-  Briefcase, BarChart, Languages, 
-  Calculator, Heart, Wrench, Truck, Leaf} from 'lucide-react';
-import { LucideIcon } from 'lucide-react';
+// Configuration API
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-type CategoryConfig = {
-  [key: string]: {
-    icon: LucideIcon;
-    color: string;
-    gradient: string;
-  }
-};
+// Types
+interface Training {
+  id: number;
+  title: string;
+  short_description: string;
+  image_url: string;
+  city: { name: string };
+  formatted_date: string;
+  formatted_price: string;
+  formatted_original_price?: string;
+  duration_days: number;
+  max_seats: number;
+  available_seats: number;
+  rating: number;
+  total_reviews: number;
+  is_popular: boolean;
+  is_full: boolean;
+  price: number;
+  original_price?: number;
+  category: { name: string };
+  trainer: {
+    name: string;
+    rating: number;
+  };
+}
 
-const ModernCatalog = () => {
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState('');
-  const [selectedDuration, setSelectedDuration] = useState('');
-  const [selectedType, setSelectedType] = useState('');
-  const [sortBy, setSortBy] = useState('popular');
-  const [showFilters, setShowFilters] = useState(false);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
-  const [favorites, setFavorites] = useState<number[]>([]);
+interface FilterData {
+  categories: Array<{ id: number; name: string; trainings_count: number }>;
+  cities: Array<{ id: number; name: string; trainings_count: number }>;
+}
 
-  // Données enrichies avec plus de diversité
-  const courses = [
-    {
-      id: 1,
-      title: "Développement Web Full Stack",
-      category: "Développement",
-      level: "Débutant",
-      type: "Certification",
-      price: 29750,
-      originalPrice: 47650,
-      image: "/api/placeholder/400/250",
-      description: "Maîtrisez HTML, CSS, JavaScript et Node.js pour devenir développeur full stack",
-      duration: "30h",
-      students: 1250,
-      rating: 4.8,
-      reviews: 342,
-      instructor: "Sophie Martin",
-      modules: 12,
-      skills: ["HTML/CSS", "JavaScript", "Node.js", "React"],
-      trending: true,
-      bestseller: false,
-      progress: 0,
-      difficulty: "Facile"
-    },
-    {
-      id: 2,
-      title: "Gestion RH Stratégique",
-      category: "Ressources Humaines",
-      level: "Avancé",
-      type: "Formation",
-      price: 53650,
-      originalPrice: 77550,
-      image: "/api/placeholder/400/250",
-      description: "Développez vos compétences en gestion des talents et stratégie RH",
-      duration: "25h",
-      students: 890,
-      rating: 4.9,
-      reviews: 156,
-      instructor: "Jean Dupont",
-      modules: 8,
-      skills: ["Recrutement", "Formation", "GPEC", "Droit social"],
-      trending: false,
-      bestseller: true,
-      progress: 0,
-      difficulty: "Difficile"
-    },
-   
-   
+interface ApiResponse {
+  data: Training[];
+  meta: {
+    last_page: number;
+    total: number;
+  };
+}
 
-   
-   
-  ];
+// Hook personnalisé pour les appels API
+const useApi = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Configuration des catégories avec les nouvelles couleurs personnalisées
-const categoryConfig: CategoryConfig = {
-  "Développement": { icon: Code, color: "white", gradient: "from-white to-white" },
-  "Ressources Humaines": { icon: Users, color: "white", gradient: "from-white to-white" },
-  "Audit & Finance": { icon: Calculator, color: "white", gradient: "from-white to-white" },
-  "Data Science": { icon: Database, color: "white", gradient: "from-white to-white" },
-  "Design": { icon: Palette, color: "white", gradient: "from-white to-white" },
-  "Sécurité Informatique": { icon: Shield, color: "white", gradient: "from-white to-white" },
-  "Management & Leadership": { icon: Briefcase, color: "white", gradient: "from-white to-white" },
-  "Commerce & Marketing": { icon: BarChart, color: "white", gradient: "from-white to-white" },
-  "Langues & Communication": { icon: Languages, color: "white", gradient: "from-white to-white" },
-  "Développement Personnel": { icon: BookOpen, color: "white", gradient: "from-white to-white" },
-  "Santé & Sécurité au travail": { icon: Heart, color: "white", gradient: "from-white to-white" },
-  "Industrie & Maintenance": { icon: Wrench, color: "white", gradient: "from-white to-white" },
-  "Logistique & Supply Chain": { icon: Truck, color: "white", gradient: "from-white to-white" },
-  "Énergies & Environnement": { icon: Leaf, color: "white", gradient: "from-white to-white" },
-};
+  const apiCall = useCallback(async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+    setLoading(true);
+    setError(null);
 
-  const levels = ["Débutant", "Intermédiaire", "Avancé"];
-  const durations = ["0-20h", "20-40h", "40h+"];
-  const types = ["Formation", "Certification", "Spécialisation"];
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(options.headers || {})
+        },
+        ...options
+      });
 
-  // Filtrage et tri CORRIGÉ
-  const filteredAndSortedCourses = useMemo(() => {
-    const filtered = courses.filter(course => {
-      const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          course.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesCategory = !selectedCategory || course.category === selectedCategory;
-      const matchesLevel = !selectedLevel || course.level === selectedLevel;
-      const matchesType = !selectedType || course.type === selectedType;
-      
-      // Correction du filtre de durée
-      let matchesDuration = true;
-      if (selectedDuration) {
-        const courseDuration = parseInt(course.duration);
-        if (selectedDuration === "0-20h") {
-          matchesDuration = courseDuration <= 20;
-        } else if (selectedDuration === "20-40h") {
-          matchesDuration = courseDuration > 20 && courseDuration <= 40;
-        } else if (selectedDuration === "40h+") {
-          matchesDuration = courseDuration > 40;
-        }
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
       }
-      
-      return matchesSearch && matchesCategory && matchesLevel && matchesType && matchesDuration;
-    });
 
-    // Tri
-    switch(sortBy) {
-      case 'popular': return filtered.sort((a, b) => b.students - a.students);
-      case 'rating': return filtered.sort((a, b) => b.rating - a.rating);
-      case 'price-low': return filtered.sort((a, b) => a.price - b.price);
-      case 'price-high': return filtered.sort((a, b) => b.price - a.price);
-      case 'newest': return filtered.sort((a, b) => b.id - a.id);
-      default: return filtered;
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  }, [searchTerm, selectedCategory, selectedLevel, selectedType, selectedDuration, sortBy]);
+  }, []);
 
-  const clearAllFilters = () => {
-    setSearchTerm('');
-    setSelectedCategory('');
-    setSelectedLevel('');
-    setSelectedType('');
-    setSelectedDuration('');
+  return { apiCall, loading, error };
+};
+
+// Hook pour débouncer les recherches
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+// Hook toast local
+const useLocalToast = () => {
+  const success = (message: string) => {
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 3000);
   };
 
-  const toggleFavorite = (courseId: number) => {
-    setFavorites(prev => 
-      prev.includes(courseId) 
-        ? prev.filter(id => id !== courseId)
-        : [...prev, courseId]
+  const error = (message: string) => {
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 3000);
+  };
+
+  return { success, error };
+};
+
+// Hook favorites simplifié
+const useFavorites = () => {
+  const [favorites, setFavorites] = useState<number[]>([]);
+
+  const isFavorite = (id: number) => favorites.includes(id);
+
+  const toggleFavorite = (id: number) => {
+    setFavorites(prev =>
+      prev.includes(id)
+        ? prev.filter(fav => fav !== id)
+        : [...prev, id]
     );
   };
 
-  const hasActiveFilters = searchTerm || selectedCategory || selectedLevel || selectedType || selectedDuration;
+  return { isFavorite, toggleFavorite };
+};
 
-  const getCategoryIcon = (category: string) => {
-    const config = categoryConfig[category];
-    if (!config) return BookOpen;
-    return config.icon;
-  };
+// Composant LazyImage
+const LazyImage: React.FC<{ src: string; alt: string; className: string }> = ({ src, alt, className }) => {
+  return <img src={src} alt={alt} className={className} loading="lazy" />;
+};
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch(difficulty) {
-      case 'Facile': return 'text-green-600 bg-green-100';
-      case 'Modéré': return 'text-yellow-600 bg-yellow-100';
-      case 'Difficile': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+// Composant ShareButton
+const ShareButton: React.FC<{ training: Training }> = ({ training }) => {
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: training.title,
+        text: training.short_description,
+        url: window.location.href,
+      });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12 relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#67B0FFFF]/10 to-[#709BFEFF]/10 rounded-3xl transform -skew-y-1"></div>
-          <div className="relative py-16 px-8">
-            <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-gray-900 via-[#9773F5FF] to-[#A553C4] bg-clip-text text-transparent mb-6">
-              Développez Vos Compétences
-            </h1>
-            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-              Formations expertes en RH, Tech, Audit et Data Science pour propulser votre carrière vers de nouveaux sommets
-            </p>
-            <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-6 text-sm text-gray-500">
-              <div className="flex items-center justify-center gap-2">
-                <Users className="h-5 w-5 text-[#6636DD]" />
-                <span>+5,000 étudiants</span>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <Award className="h-5 w-5 text-[#22c55e]" />
-                <span>Certifications reconnues</span>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <TrendingUp className="h-5 w-5 text-[#A553C4]" />
-                <span>Contenus mis à jour</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    <button
+      onClick={handleShare}
+      className="p-2 rounded-full bg-white/80 text-gray-400 hover:text-blue-500 backdrop-blur-sm transition-all"
+    >
+      <Share2 className="h-4 w-4" />
+    </button>
+  );
+};
 
-        {/* Search and Filters - Version Mobile améliorée */}
-        <div className="mb-8 sticky top-0 bg-white/80 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg p-4 md:p-6 z-20">
-          {/* Mobile Layout */}
-          <div className="block lg:hidden">
-            {/* Search Bar Mobile */}
-            <div className="relative mb-4">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+// Composant Modal d'inscription
+interface RegistrationModalProps {
+  training: Training | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const RegistrationModal: React.FC<RegistrationModalProps> = ({
+  training,
+  isOpen,
+  onClose,
+  onSuccess
+}) => {
+  const [formData, setFormData] = useState({
+    participant_name: '',
+    participant_email: '',
+    participant_phone: '',
+    company: '',
+    notes: ''
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { apiCall } = useApi();
+  const { success, error } = useLocalToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!training) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      await apiCall<{ message: string }>('/registrations', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...formData,
+          training_id: training.id
+        })
+      });
+
+      success('Inscription réussie ! Vous recevrez un email de confirmation.');
+      onSuccess();
+      onClose();
+      setFormData({
+        participant_name: '',
+        participant_email: '',
+        participant_phone: '',
+        company: '',
+        notes: ''
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'inscription';
+      setSubmitError(errorMessage);
+      error(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  if (!isOpen || !training) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-gray-900">S'inscrire à la formation</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+            <h4 className="font-semibold text-blue-900">{training.title}</h4>
+            <p className="text-sm text-blue-700 mt-1">
+              {training.city.name} • {training.formatted_date} • {training.formatted_price}
+            </p>
+          </div>
+
+          {submitError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <span className="text-red-700 text-sm">{submitError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet *</label>
               <input
                 type="text"
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#A553C4] focus:border-transparent transition-all bg-white/70"
+                name="participant_name"
+                value={formData.participant_name}
+                onChange={handleInputChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Votre nom complet"
               />
-              {searchTerm && (
-                <button 
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
-                >
-                  <X className="h-4 w-4 text-gray-400" />
-                </button>
-              )}
             </div>
 
-            {/* Mobile Filter Toggle */}
-            <div className="flex gap-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                name="participant_email"
+                value={formData.participant_email}
+                onChange={handleInputChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="votre@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone *</label>
+              <input
+                type="tel"
+                name="participant_phone"
+                value={formData.participant_phone}
+                onChange={handleInputChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="+225 XX XX XX XX"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Entreprise</label>
+              <input
+                type="text"
+                name="company"
+                value={formData.company}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Nom de votre entreprise"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optionnel)</label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Questions ou informations supplémentaires..."
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
               <button
-                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white rounded-xl hover:from-[#9643B4] hover:to-[#5526CD] transition-all"
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50"
               >
-                <Filter className="h-4 w-4" />
-                Filtres
-                <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+                Annuler
               </button>
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-3 border border-gray-200 rounded-xl bg-white/70 focus:ring-2 focus:ring-[#A553C4] flex-shrink-0"
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <option value="popular">Populaires</option>
-                <option value="rating">Mieux notées</option>
-                <option value="price-low">Prix ↑</option>
-                <option value="price-high">Prix ↓</option>
-                <option value="newest">Récentes</option>
-              </select>
-            </div>
-
-            {/* Mobile Filters Panel */}
-            {showMobileFilters && (
-              <div className="mt-4 p-4 bg-white/90 rounded-xl border border-gray-200 space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <select 
-                    value={selectedCategory} 
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-[#A553C4]"
-                  >
-                    <option value="">Tous les domaines</option>
-                    {Object.keys(categoryConfig).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <select 
-                      value={selectedLevel} 
-                      onChange={(e) => setSelectedLevel(e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-[#A553C4]"
-                    >
-                      <option value="">Tous niveaux</option>
-                      {levels.map(level => (
-                        <option key={level} value={level}>{level}</option>
-                      ))}
-                    </select>
-
-                    <select 
-                      value={selectedType} 
-                      onChange={(e) => setSelectedType(e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-[#A553C4]"
-                    >
-                      <option value="">Tous types</option>
-                      {types.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <select 
-                    value={selectedDuration} 
-                    onChange={(e) => setSelectedDuration(e.target.value)}
-                    className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-[#A553C4]"
-                  >
-                    <option value="">Toutes durées</option>
-                    {durations.map(duration => (
-                      <option key={duration} value={duration}>{duration}</option>
-                    ))}
-                  </select>
-
-                  {hasActiveFilters && (
-                    <button
-                      onClick={clearAllFilters}
-                      className="w-full px-4 py-2 text-[#2D1397] border border-[#2D1397]/30 rounded-lg hover:bg-[#2D1397]/10 transition-all"
-                    >
-                      Effacer tous les filtres
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Layout */}
-          <div className="hidden lg:block">
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              {/* Search Bar */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher par titre, compétence..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#A553C4] focus:border-transparent transition-all bg-white/70"
-                />
-                {searchTerm && (
-                  <button 
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
-                  >
-                    <X className="h-4 w-4 text-gray-400" />
-                  </button>
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Inscription...
+                  </>
+                ) : (
+                  'S\'inscrire'
                 )}
-              </div>
-
-              {/* Quick Filters */}
-              <div className="flex flex-wrap gap-2">
-                <select 
-                  value={selectedCategory} 
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-[#A553C4]"
-                >
-                  <option value="">Tous les domaines</option>
-                  {Object.keys(categoryConfig).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-
-                <select 
-                  value={selectedLevel} 
-                  onChange={(e) => setSelectedLevel(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-[#A553C4]"
-                >
-                  <option value="">Tous niveaux</option>
-                  {levels.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-[#A553C4]"
-                >
-                  <option value="popular">Plus populaires</option>
-                  <option value="rating">Mieux notées</option>
-                  <option value="price-low">Prix croissant</option>
-                  <option value="price-high">Prix décroissant</option>
-                  <option value="newest">Plus récentes</option>
-                </select>
-              </div>
-
-              {/* Advanced Filters Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white rounded-lg hover:from-[#9643B4] hover:to-[#5526CD] transition-all transform hover:scale-105"
-              >
-                <Filter className="h-4 w-4" />
-                Filtres
               </button>
             </div>
-
-            {/* Advanced Filters */}
-            {showFilters && (
-              <div className="mt-6 pt-6 border-t border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Type de formation</label>
-                  <select 
-                    value={selectedType} 
-                    onChange={(e) => setSelectedType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white/70 focus:ring-2 focus:ring-[#A553C4]"
-                  >
-                    <option value="">Tous types</option>
-                    {types.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Durée</label>
-                  <select 
-                    value={selectedDuration} 
-                    onChange={(e) => setSelectedDuration(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white/70 focus:ring-2 focus:ring-[#A553C4]"
-                  >
-                    <option value="">Toutes durées</option>
-                    {durations.map(duration => (
-                      <option key={duration} value={duration}>{duration}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  {hasActiveFilters && (
-                    <button
-                      onClick={clearAllFilters}
-                      className="w-full px-4 py-2 text-[#2D1397] border border-[#2D1397]/30 rounded-lg hover:bg-[#2D1397]/10 transition-all"
-                    >
-                      Effacer tous les filtres
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Results Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-              {filteredAndSortedCourses.length} formation{filteredAndSortedCourses.length > 1 ? 's' : ''} trouvée{filteredAndSortedCourses.length > 1 ? 's' : ''}
-            </h2>
-            {hasActiveFilters && (
-              <p className="text-gray-600 mt-1 text-sm md:text-base">Résultats filtrés selon vos critères</p>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all hover:border-[#A553C4]"
-            >
-              {viewMode === 'grid' ? '☰' : '⊞'}
-            </button>
-          </div>
-        </div>
-
-        {/* Course Grid */}
-        {filteredAndSortedCourses.length > 0 ? (
-          <div className={`grid gap-6 md:gap-8 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-            {filteredAndSortedCourses.map((course) => {
-              const CategoryIcon = getCategoryIcon(course.category);
-              const config = categoryConfig[course.category] || { gradient: "from-gray-500 to-gray-600" };
-              const isFavorite = favorites.includes(course.id);
-              
-              return (
-                <div 
-                  key={course.id} 
-                  className="group relative bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-700 transform hover:-translate-y-3 border border-gray-100 overflow-hidden"
-                >
-                  {/* Background Pattern */}
-                  <div className="absolute inset-0 opacity-5">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#A553C4] to-[#6636DD] rounded-full -translate-y-16 translate-x-16"></div>
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-[#6636DD] to-[#A553C4] rounded-full translate-y-12 -translate-x-12"></div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="relative p-6 md:p-8">
-                    {/* Header avec icône catégorie */}
-                    <div className="flex items-start justify-between mb-6">
-                      <div className={`p-3 rounded-2xl bg-gradient-to-br ${config.gradient} shadow-lg`}>
-                        <CategoryIcon className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-xl md:text-2xl text-gray-900">{course.price.toLocaleString('fr-FR')} F</div>
-                        {course.originalPrice > course.price && (
-                          <div className="text-sm text-gray-500 line-through">{course.originalPrice.toLocaleString('fr-FR')} F</div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Title & Category */}
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{course.category}</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(course.difficulty)}`}>
-                          {course.difficulty}
-                        </span>
-                      </div>
-                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 leading-tight">
-                        {course.title}
-                      </h3>
-                    </div>
-                    {/* Description */}
-                    <p className="text-gray-600 text-sm mb-6 line-clamp-2 leading-relaxed">
-                      {course.description}
-                    </p>
-                    
-                    {/* Stats Row */}
-                    <div className="flex items-center justify-between mb-6 text-sm">
-                      <div className="flex items-center gap-1 text-yellow-500">
-                        <Star className="h-4 w-4 fill-current" />
-                        <span className="font-medium text-gray-900">{course.rating}</span>
-                        <span className="text-gray-500">({course.reviews})</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <Users className="h-4 w-4" />
-                        <span>{course.students.toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <Clock className="h-4 w-4" />
-                        <span>{course.duration}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Skills */}
-                    <div className="mb-6">
-                      <div className="flex flex-wrap gap-2">
-                        {course.skills.slice(0, 3).map((skill, index) => (
-                          <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                            {skill}
-                          </span>
-                        ))}
-                        {course.skills.length > 3 && (
-                          <span className="text-gray-400 text-xs py-1 px-2">
-                            +{course.skills.length - 3} autres
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Instructor */}
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="text-sm">
-                        <span className="text-gray-500">Formateur : </span>
-                        <span className="font-medium text-gray-900">{course.instructor}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <BookOpen className="h-4 w-4" />
-                        <span>{course.modules} modules</span>
-                      </div>
-                    </div>
-                    
-                    {/* Action Button */}
-                    <button 
-                      onClick={() => navigate('/paiement')}
-                      className={`group w-full py-4 rounded-2xl font-semibold transition-all duration-300 bg-gradient-to-r ${config.gradient} text-white hover:shadow-2xl hover:scale-105 transform relative overflow-hidden`}
-                    >
-                      <span className="relative z-10 flex items-center justify-center gap-2">
-                        Commencer maintenant
-                        <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                      </span>
-                      <div className="absolute inset-0 bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
-                    </button>
-                  </div>
-
-                  {/* Hover Effect Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <div className="bg-white rounded-3xl shadow-xl p-12 max-w-md mx-auto border border-gray-100">
-              <div className="text-6xl mb-6">🔍</div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Aucune formation trouvée</h3>
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                Essayez de modifier vos critères de recherche ou explorez nos catégories populaires.
-              </p>
-              <button
-                onClick={() => navigate('/catalog')}
-                className="px-8 py-4 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white rounded-2xl hover:shadow-lg transition-all transform hover:scale-105"
-              >
-                Voir toutes les formations
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Popular Categories Section */}
-        <div className="mt-20 mb-16">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Explorez nos domaines d'expertise</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {Object.entries(categoryConfig).map(([category, config]) => {
-              const IconComponent = config.icon;
-              const categoryCount = courses.filter(course => course.category === category).length;
-              
-              return (
-                <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`group p-6 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${
-                    selectedCategory === category 
-                      ? `bg-gradient-to-br ${config.gradient} text-white shadow-lg` 
-                      : 'bg-white hover:bg-gray-50 text-gray-700 shadow-md border border-gray-100'
-                  }`}
-                >
-                  <div className={`mx-auto mb-4 p-3 rounded-full ${
-                    selectedCategory === category 
-                      ? 'bg-white/20' 
-                      : `bg-gradient-to-br ${config.gradient}`
-                  }`}>
-                    <IconComponent className={`h-6 w-6 ${
-                      selectedCategory === category ? 'text-white' : 'text-white'
-                    }`} />
-                  </div>
-                  <h3 className="font-semibold text-sm mb-2">{category}</h3>
-                  <p className={`text-xs ${
-                    selectedCategory === category ? 'text-white/80' : 'text-gray-500'
-                  }`}>
-                    {categoryCount} formation{categoryCount > 1 ? 's' : ''}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Stats Section */}
-        <div className="mb-20">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-              <div className="text-4xl font-bold text-[#6636DD] mb-2">....+</div>
-              <div className="text-gray-600">Étudiants actifs</div>
-            </div>
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-              <div className="text-4xl font-bold text-[#22c55e] mb-2">....+</div>
-              <div className="text-gray-600">Formations disponibles</div>
-            </div>
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-              <div className="text-4xl font-bold text-[#A553C4] mb-2">....%</div>
-              <div className="text-gray-600">Taux de satisfaction</div>
-            </div>
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-              <div className="text-4xl font-bold text-[#2D1397] mb-2">24/7</div>
-              <div className="text-gray-600">Support disponible</div>
-            </div>
-          </div>
-        </div>
-
-        {/* CTA Section */}
-        <div className="mt-20 relative overflow-hidden">
-          <div className="bg-gradient-to-r from-[#6636DD] via-[#A553C4] to-[#2D1397] rounded-3xl p-12 text-center text-white relative">
-            {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full -translate-x-20 -translate-y-20"></div>
-              <div className="absolute top-20 right-0 w-32 h-32 bg-white rounded-full translate-x-16 -translate-y-16"></div>
-              <div className="absolute bottom-0 left-1/3 w-28 h-28 bg-white rounded-full translate-y-14"></div>
-              <div className="absolute bottom-10 right-20 w-24 h-24 bg-white rounded-full"></div>
-            </div>
-            
-            <div className="relative z-10">
-              <h2 className="text-4xl font-bold mb-6">Prêt à transformer votre carrière ?</h2>
-              <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-                Rejoignez des milliers de professionnels qui ont choisi l'excellence et propulsé leur carrière vers de nouveaux sommets
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button className="bg-white text-[#6636DD] px-8 py-4 rounded-2xl font-bold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg">
-                  Découvrir nos parcours
-                </button>
-                <button className="border-2 border-white text-white px-8 py-4 rounded-2xl font-bold hover:bg-white hover:text-[#6636DD] transition-all transform hover:scale-105">
-                  Parler à un conseiller
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Newsletter Section */}
-        <div className="mt-16 bg-gradient-to-br from-gray-50 to-purple-50 rounded-3xl p-12 text-center border border-gray-100">
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">Restez informé des nouveautés</h3>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Recevez nos dernières formations, conseils carrière et offres exclusives
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="Votre adresse email"
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#A553C4] focus:border-transparent"
-            />
-            <button className="px-6 py-3 bg-gradient-to-r from-[#A553C4] to-[#6636DD] text-white rounded-xl hover:shadow-lg transition-all transform hover:scale-105">
-              S'abonner
-            </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>
   );
 };
 
-export default ModernCatalog;
+// Composant carte de formation
+interface TrainingCardProps {
+  training: Training;
+  onRegister: (training: Training) => void;
+  onViewDetails: (trainingId: number) => void;
+  comparison: Training[];
+  onToggleComparison: (training: Training) => void;
+}
+
+const TrainingCard: React.FC<TrainingCardProps> = ({
+  training,
+  onRegister,
+  onViewDetails,
+  comparison,
+  onToggleComparison
+}) => {
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { success } = useLocalToast();
+
+  const handleFavoriteClick = () => {
+    toggleFavorite(training.id);
+    success(
+      isFavorite(training.id)
+        ? 'Formation retirée des favoris'
+        : 'Formation ajoutée aux favoris'
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 relative">
+      <div className="absolute top-3 right-3 flex gap-2 z-10">
+        <button
+          onClick={handleFavoriteClick}
+          className={`p-2 rounded-full backdrop-blur-sm transition-all ${
+            isFavorite(training.id)
+              ? 'bg-red-100 text-red-500'
+              : 'bg-white/80 text-gray-400 hover:text-red-500'
+          }`}
+        >
+          <Heart className={`h-4 w-4 ${isFavorite(training.id) ? 'fill-current' : ''}`} />
+        </button>
+
+        <ShareButton training={training} />
+
+        <button
+          onClick={() => onToggleComparison(training)}
+          className={`p-2 rounded-full backdrop-blur-sm transition-all ${
+            comparison.some(t => t.id === training.id)
+              ? 'bg-blue-100 text-blue-500'
+              : 'bg-white/80 text-gray-400 hover:text-blue-500'
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="relative h-48 overflow-hidden">
+        <LazyImage
+          src={training.image_url}
+          alt={training.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute top-3 left-3 flex gap-2">
+          {training.is_popular && (
+            <span className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+              Populaire
+            </span>
+          )}
+          {training.available_seats < 5 && training.available_seats > 0 && (
+            <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+              Plus que {training.available_seats} places
+            </span>
+          )}
+          {training.is_full && (
+            <span className="bg-gray-700 text-white px-2 py-1 rounded-full text-xs font-bold">
+              Complet
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-6">
+        <div className="flex justify-between items-start mb-2">
+          <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+            {training.category.name}
+          </span>
+          <div className="flex items-center gap-1 text-yellow-500">
+            <Star className="h-4 w-4 fill-current" />
+            <span className="text-gray-900 font-medium">{training.rating}</span>
+            <span className="text-gray-500 text-sm">({training.total_reviews})</span>
+          </div>
+        </div>
+
+        <h3 
+          className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600"
+          onClick={() => onViewDetails(training.id)}
+        >
+          {training.title}
+        </h3>
+        <p className="text-gray-600 mb-4 line-clamp-2">{training.short_description}</p>
+
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center gap-2 text-gray-700">
+            <MapPin className="h-5 w-5 text-gray-400" />
+            <span>{training.city.name}</span>
+          </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <Calendar className="h-5 w-5 text-gray-400" />
+            <span>{training.formatted_date}</span>
+          </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <Clock className="h-5 w-5 text-gray-400" />
+            <span>{training.duration_days} jour{training.duration_days > 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <Users className="h-5 w-5 text-gray-400" />
+            <span>{training.max_seats} places max ({training.available_seats} disponibles)</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 font-semibold text-sm">
+              {training.trainer.name.split(' ').map(n => n[0]).join('')}
+            </span>
+          </div>
+          <div>
+            <p className="font-medium text-gray-900 text-sm">{training.trainer.name}</p>
+            <div className="flex items-center gap-1">
+              <Star className="h-3 w-3 text-yellow-400 fill-current" />
+              <span className="text-xs text-gray-600">{training.trainer.rating}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center mt-6">
+          <div>
+            {training.original_price && training.original_price > training.price && (
+              <span className="text-sm text-gray-500 line-through mr-2">
+                {training.formatted_original_price}
+              </span>
+            )}
+            <span className="text-xl font-bold text-gray-900">
+              {training.formatted_price}
+            </span>
+          </div>
+          <button
+            onClick={() => onRegister(training)}
+            disabled={training.is_full}
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-1 transition-all ${
+              training.is_full
+                ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
+            }`}
+          >
+            {training.is_full ? 'Complet' : 'S\'inscrire'}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Composant principal
+const InPersonTrainingCatalog: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'all'>('upcoming');
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('start_date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [filterData, setFilterData] = useState<FilterData>({ categories: [], cities: [] });
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+
+  const [selectedTraining, setSelectedTraining] = useState<Training | null>(null);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [comparison, setComparison] = useState<Training[]>([]);
+
+  const { apiCall, loading, error } = useApi();
+
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
+  useEffect(() => {
+    const loadFilterData = async () => {
+      try {
+        const data = await apiCall<FilterData>('/courses/filters/data');
+        setFilterData(data);
+      } catch (err) {
+        console.error('Erreur lors du chargement des filtres:', err);
+      }
+    };
+
+    loadFilterData();
+  }, [apiCall]);
+
+  const loadTrainings = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+      if (selectedCity) params.append('city_id', selectedCity);
+      if (selectedCategory) params.append('category_id', selectedCategory);
+      if (activeTab !== 'all') params.append('tab', activeTab);
+      if (currentPage > 1) params.append('page', currentPage.toString());
+      if (sortBy) params.append('sort_by', sortBy);
+      if (sortOrder) params.append('sort_order', sortOrder);
+
+      const data: ApiResponse = await apiCall<ApiResponse>(`/courses?${params.toString()}`);
+      setTrainings(data.data);
+      setTotalPages(data.meta.last_page);
+      setTotalResults(data.meta.total);
+    } catch (err) {
+      console.error('Erreur lors du chargement des formations:', err);
+    }
+  }, [apiCall, debouncedSearchTerm, selectedCity, selectedCategory, activeTab, currentPage, sortBy, sortOrder]);
+
+  useEffect(() => {
+    loadTrainings();
+  }, [loadTrainings]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, selectedCity, selectedCategory, activeTab, sortBy, sortOrder]);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCity('');
+    setSelectedCategory('');
+    setCurrentPage(1);
+    setSortBy('start_date');
+    setSortOrder('asc');
+  };
+
+  const handleRegistration = (training: Training) => {
+    setSelectedTraining(training);
+    setShowRegistrationModal(true);
+  };
+
+  const handleViewDetails = (trainingId: number) => {
+    console.log('Voir détails formation:', trainingId);
+  };
+
+  const handleRegistrationSuccess = () => {
+    setSuccessMessage('Inscription réussie ! Vous recevrez un email de confirmation.');
+    setTimeout(() => setSuccessMessage(''), 5000);
+    loadTrainings();
+  };
+
+  const handleToggleComparison = (training: Training) => {
+    setComparison(prev => {
+      const exists = prev.find(t => t.id === training.id);
+      if (exists) {
+        return prev.filter(t => t.id !== training.id);
+      } else if (prev.length < 3) {
+        return [...prev, training];
+      } else {
+        return prev;
+      }
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {successMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+          <Check className="h-5 w-5" />
+          {successMessage}
+        </div>
+      )}
+
+      {comparison.length > 0 && (
+        <div className="sticky top-0 z-30 bg-blue-600 text-white px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="font-medium">
+                {comparison.length} formation{comparison.length > 1 ? 's' : ''} sélectionnée{comparison.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <button onClick={() => setComparison([])} className="p-2 hover:bg-white/20 rounded">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white py-20">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6">Formations en Présentiel</h1>
+            <p className="text-xl md:text-2xl max-w-3xl mx-auto mb-8">
+              Apprentissage immersif avec nos experts
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <div className="relative flex-1 max-w-2xl">
+                <input
+                  type="text"
+                  placeholder="Rechercher une formation..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 focus:ring-2 focus:ring-white focus:outline-none placeholder-white/70"
+                />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/80" />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-6 py-4 bg-white text-blue-800 rounded-lg font-medium hover:bg-gray-100 transition-all"
+              >
+                <Filter className="h-5 w-5" />
+                Filtres
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="max-w-7xl mx-auto px-4 py-6 -mt-8 bg-white rounded-xl shadow-lg z-10 relative">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ville</label>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Toutes les villes</option>
+                {filterData.cities.map(city => (
+                  <option key={city.id} value={city.id}>
+                    {city.name} ({city.trainings_count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Catégorie</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Toutes catégories</option>
+                {filterData.categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name} ({category.trainings_count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Trier par</label>
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newSortBy, newSortOrder] = e.target.value.split('-');
+                  setSortBy(newSortBy);
+                  setSortOrder(newSortOrder as 'asc' | 'desc');
+                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="start_date-asc">Date (plus proche)</option>
+                <option value="price-asc">Prix (croissant)</option>
+                <option value="rating-desc">Note (meilleure)</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                onClick={clearFilters}
+                className="w-full px-4 py-3 text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 border border-blue-200 rounded-lg hover:bg-blue-50"
+              >
+                <X className="h-4 w-4" />
+                Réinitialiser
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="flex border-b border-gray-200 mb-8">
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`px-6 py-3 font-medium text-sm ${activeTab === 'upcoming' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            À venir
+          </button>
+          <button
+            onClick={() => setActiveTab('past')}
+            className={`px-6 py-3 font-medium text-sm ${activeTab === 'past' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Passées
+          </button>
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-6 py-3 font-medium text-sm ${activeTab === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Toutes
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <span className="text-red-700">Erreur : {error}</span>
+          </div>
+        )}
+
+        {loading && trainings.length === 0 && (
+          <div className="flex justify-center items-center py-16">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Chargement des formations...</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && trainings.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {trainings.map(training => (
+                <TrainingCard
+                  key={training.id}
+                  training={training}
+                  onRegister={handleRegistration}
+                  onViewDetails={handleViewDetails}
+                  comparison={comparison}
+                  onToggleComparison={handleToggleComparison}
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-12">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1 || loading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Précédent
+                </button>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const pageNum = Math.max(1, currentPage - 2) + i;
+                    if (pageNum > totalPages) return null;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        disabled={loading}
+                        className={`px-4 py-2 rounded-lg font-medium ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-300 hover:bg-gray-50'
+                        } disabled:opacity-50`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || loading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Suivant
+                </button>
+              </div>
+            )}
+          </>
+        ) : !loading && (
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Aucune formation trouvée</h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm || selectedCity || selectedCategory
+                  ? "Essayez d'ajuster vos critères de recherche"
+                  : "Aucune formation programmée pour le moment"}
+              </p>
+              <button
+                onClick={clearFilters}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium"
+              >
+                Réinitialiser les filtres
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-gray-100 py-16">
+        <div className="max-w-7xl mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+            Pourquoi choisir nos formations en présentiel ?
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                title: "Apprentissage immersif",
+                description: "Environnement dédié à 100% à votre formation sans distractions",
+                icon: "🎯"
+              },
+              {
+                title: "Réseau professionnel",
+                description: "Rencontrez d'autres professionnels et échangez avec des experts",
+                icon: "🤝"
+              },
+              {
+                title: "Pratique intensive",
+                description: "Mises en situation réelles avec feedback immédiat des formateurs",
+                icon: "⚡"
+              },
+              {
+                title: "Matériel fourni",
+                description: "Tout le nécessaire technique est mis à disposition sur place",
+                icon: "🛠️"
+              },
+              {
+                title: "Lieux inspirants",
+                description: "Nos centres de formation sont conçus pour favoriser la créativité",
+                icon: "🏢"
+              },
+              {
+                title: "Suivi post-formation",
+                description: "Accès à un mentor pendant 1 mois après votre formation",
+                icon: "📞"
+              }
+            ].map((benefit, index) => (
+              <div key={index} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="text-4xl mb-4">{benefit.icon}</div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{benefit.title}</h3>
+                <p className="text-gray-600">{benefit.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <RegistrationModal
+        training={selectedTraining}
+        isOpen={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        onSuccess={handleRegistrationSuccess}
+      />
+    </div>
+  );
+};
+
+export default InPersonTrainingCatalog;

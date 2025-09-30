@@ -15,25 +15,34 @@ class TrainingDetailResource extends JsonResource
             'description' => $this->description,
             'short_description' => $this->short_description,
             'category' => [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
-                'slug' => $this->category->slug,
-                'subcategories' => $this->category->subcategories
+                'id' => optional($this->category)->id,
+                'name' => optional($this->category)->name ?? '',
+                'slug' => optional($this->category)->slug ?? '',
+                'subcategories' => optional($this->category)->subcategories ?? []
             ],
             'city' => [
-                'id' => $this->city->id,
-                'name' => $this->city->name,
-                'country' => $this->city->country
+                'id' => optional($this->city)->id,
+                'name' => optional($this->city)->name ?? '',
+                'country' => optional($this->city)->country ?? ''
             ],
-            'trainer' => [
-                'id' => $this->trainer->id,
-                'name' => $this->trainer->name,
-                'bio' => $this->trainer->bio,
-                'rating' => $this->trainer->rating,
-                'total_reviews' => $this->trainer->total_reviews,
-                'avatar_url' => $this->trainer->avatar_url,
-                'specializations' => $this->trainer->specializations
-            ],
+            'trainer' => $this->when(
+                $this->relationLoaded('trainer') && $this->trainer,
+                function () {
+                    return [
+                        'id' => $this->trainer->id,
+                        'name' => $this->trainer->name,
+                        'bio' => $this->trainer->bio,
+                        'rating' => $this->trainer->rating,
+                        'total_reviews' => $this->trainer->total_reviews,
+                        'avatar_url' => $this->trainer->avatar_url,
+                        'specializations' => $this->trainer->specializations
+                    ];
+                },
+                [
+                    'id' => $this->trainer_id ?? null,
+                    'name' => $this->trainer_name ?? 'Formateur non spécifié'
+                ]
+            ),
             'schedule' => [
                 'start_date' => $this->start_date->format('Y-m-d'),
                 'end_date' => $this->end_date->format('Y-m-d'),

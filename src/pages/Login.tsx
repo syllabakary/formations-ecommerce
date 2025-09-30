@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import RegistrationForm from '../components/RegistrationForm';
 import OTPForm from '../components/OTPForm';
+import { LogIn } from 'lucide-react';
 
 type AuthMode = 'login' | 'register' | 'verify-otp';
 
@@ -27,6 +28,7 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [otpEmail, setOtpEmail] = useState(''); // Pour stocker l'email pendant la vérification OTP
+  const [shake, setShake] = useState(false);
 
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -56,21 +58,27 @@ const Login: React.FC = () => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
       showMessage('error', 'Veuillez remplir tous les champs');
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await login(formData.email, formData.password);
-      
+
       if (response.success) {
         showMessage('success', 'Connexion réussie !');
         // La navigation se fera automatiquement via useEffect
       } else {
         showMessage('error', response.message);
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
       }
-    } catch (error) {
+    } catch {
       showMessage('error', 'Une erreur est survenue');
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
     } finally {
       setIsLoading(false);
     }
@@ -201,9 +209,10 @@ const Login: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${shake ? 'animate-shake' : ''}`}
             >
               {isLoading ? 'Connexion...' : 'Se connecter'}
+              <LogIn className="ml-2 h-4 w-4" />
             </button>
           </form>
         ) : (
