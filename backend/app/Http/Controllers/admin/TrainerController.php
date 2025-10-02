@@ -1,8 +1,6 @@
 <?php
 
-// app/Http/Controllers/Api/Admin/TrainerController.php
-
-namespace App\Http\Controllers\Api\Admin;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Trainer;
@@ -16,7 +14,8 @@ class TrainerController extends Controller
             ->withCount(['courses as courses_count' => function ($query) {
                 $query->active();
             }])
-            ->orderBy('name')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
             ->get();
 
         return response()->json([

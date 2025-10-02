@@ -90,27 +90,37 @@ class TrainingController extends Controller
                 'id' => $course->id,
                 'title' => $course->title,
                 'slug' => $course->slug,
-                'description' => $course->short_description,
-                'image' => $course->image_url,
-                'category' => optional($course->category)->name ?? '',
-                'level' => ucfirst($course->level),
-                'type' => ucfirst($course->type),
-                'difficulty' => ucfirst($course->difficulty),
+                'short_description' => $course->short_description,
+                'description' => $course->description,
+                'image' => $course->image,
+                'image_url' => $course->image_url,
+                'type' => $course->type,
+                'level' => $course->level,
+                'difficulty' => $course->difficulty,
                 'price' => $course->price,
                 'original_price' => $course->original_price,
                 'formatted_price' => $course->formatted_price,
                 'formatted_original_price' => $course->formatted_original_price,
-                'discount' => $course->discount_percentage,
-                'duration' => $course->duration_formatted,
-                'modules' => $course->modules_count,
+                'discount_percentage' => $course->discount_percentage,
+                'duration_hours' => $course->duration,
+                'duration_formatted' => $course->duration_formatted,
                 'skills' => $course->skills,
                 'rating' => $course->rating,
-                'reviews' => $course->total_reviews,
-                'students' => $course->total_students,
-                'instructor' => optional($course->trainer)->name ?? '',
-                'trending' => $course->is_trending,
-                'bestseller' => $course->is_bestseller,
-                'new' => $course->is_new,
+                'total_reviews' => $course->total_reviews,
+                'total_students' => $course->total_students,
+                'is_trending' => $course->is_trending,
+                'is_bestseller' => $course->is_bestseller,
+                'is_new' => $course->is_new,
+                'is_active' => $course->is_active,
+                'category' => [
+                    'id' => optional($course->category)->id ?? null,
+                    'name' => optional($course->category)->name ?? '',
+                ],
+                'trainer' => [
+                    'id' => optional($course->trainer)->id ?? null,
+                    'name' => optional($course->trainer)->name ?? '',
+                    'email' => optional($course->trainer)->email ?? '',
+                ],
                 'mode' => 'online',
                 'available_seats' => $course->available_seats,
                 'is_full' => $course->is_full,
@@ -135,13 +145,21 @@ class TrainingController extends Controller
     protected function getInPersonTrainings(Request $request): JsonResponse
     {
         $tab = $request->get('tab', 'upcoming'); // 'upcoming', 'past', 'all'
-        
+        $status = $request->get('status'); // Allow filtering by specific status
+
         $query = InPersonTraining::query()
             ->with(['category', 'city', 'trainer'])
-            ->active()
-            ->scheduled();
+            ->active(); // Only active trainings
 
-        // Tab filters
+        // Status filter - if specific status requested, use it
+        if ($status) {
+            $query->byStatus($status);
+        } else {
+            // Default behavior: show all active trainings regardless of status
+            // This allows completed and cancelled trainings to be shown if needed
+        }
+
+        // Tab filters (for backward compatibility)
         switch ($tab) {
             case 'upcoming':
                 $query->upcoming();
@@ -197,13 +215,17 @@ class TrainingController extends Controller
                 'title' => $training->title,
                 'slug' => $training->slug,
                 'short_description' => $training->short_description,
+                'description' => $training->description,
+                'image' => $training->image,
                 'image_url' => $training->image_url,
                 'city' => [
+                    'id' => optional($training->city)->id ?? null,
                     'name' => optional($training->city)->name ?? '',
                 ],
                 'formatted_date' => $training->formatted_date,
                 'formatted_price' => $training->formatted_price,
                 'formatted_original_price' => $training->formatted_original_price,
+                'discount_percentage' => $training->discount_percentage,
                 'duration_days' => $training->duration_days,
                 'max_seats' => $training->max_seats,
                 'available_seats' => $training->available_seats,
@@ -214,11 +236,13 @@ class TrainingController extends Controller
                 'price' => $training->price,
                 'original_price' => $training->original_price,
                 'category' => [
+                    'id' => optional($training->category)->id ?? null,
                     'name' => optional($training->category)->name ?? '',
                 ],
                 'trainer' => [
+                    'id' => optional($training->trainer)->id ?? null,
                     'name' => optional($training->trainer)->name ?? '',
-                    'rating' => optional($training->trainer)->rating ?? 0,
+                    'email' => optional($training->trainer)->email ?? '',
                 ],
                 'mode' => 'in-person',
                 'can_register' => $training->can_register,
@@ -322,85 +346,253 @@ class TrainingController extends Controller
     }
 
     /**
-     * Store a new course
+     * Store a new course or in-person training
      */
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'short_description' => 'required|string|max:500',
-            'category_id' => 'required|exists:categories,id',
-            'trainer_id' => 'required|exists:trainers,id',
-            'level' => 'required|in:beginner,intermediate,advanced',
-            'type' => 'required|in:video,live,hybrid',
-            'difficulty' => 'required|in:easy,medium,hard',
-            'price' => 'required|numeric|min:0',
-            'original_price' => 'nullable|numeric|min:0',
-            'duration' => 'required|integer|min:1',
-            'image' => 'nullable|string',
-            'skills' => 'nullable|array',
-            'is_trending' => 'boolean',
-            'is_bestseller' => 'boolean',
-            'is_new' => 'boolean',
-        ]);
+        $mode = $request->get('mode');
 
-        $course = Course::create($validated);
+        // Auto-detect mode if not provided
+        if (!$mode) {
+            if ($request->has('city_name')) {
+                $mode = 'in-person';
+            } elseif ($request->has('trainer_id')) {
+                $mode = 'online';
+            } else {
+                $mode = 'online'; // default
+            }
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Course created successfully',
-            'data' => $course
-        ], 201);
+        if ($mode === 'online') {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'required|string',
+                'short_description' => 'required|string|max:500',
+                'category_id' => 'required|exists:categories,id',
+                'trainer_id' => 'required|exists:trainers,id',
+                'level' => 'required|in:beginner,intermediate,advanced',
+                'type' => 'required|in:video,live,hybrid',
+                'difficulty' => 'required|in:easy,medium,hard',
+                'price' => 'required|numeric|min:0',
+                'original_price' => 'nullable|numeric|min:0',
+                'duration' => 'required|integer|min:1',
+                'image' => 'nullable|string',
+                'skills' => 'nullable|array',
+                'is_trending' => 'boolean',
+                'is_bestseller' => 'boolean',
+                'is_new' => 'boolean',
+            ]);
+
+            $course = Course::create($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Course created successfully',
+                'data' => $course
+            ], 201);
+        } else {
+            // In-person training validation
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'required|string',
+                'short_description' => 'required|string|max:500',
+                'category_id' => 'required|exists:categories,id',
+                'trainer_name' => 'required|string|max:255',
+                'city_name' => 'required|string|max:255',
+                'price' => 'required|numeric|min:0',
+                'original_price' => 'nullable|numeric|min:0',
+                'duration_days' => 'required|integer|min:1',
+                'start_date' => 'required|date|after:today',
+                'end_date' => 'required|date|after_or_equal:start_date',
+                'start_time' => 'required|date_format:H:i',
+                'end_time' => 'required|date_format:H:i|after:start_time',
+                'venue_name' => 'required|string|max:255',
+                'venue_address' => 'required|string',
+                'max_seats' => 'required|integer|min:1',
+                'status' => 'required|in:scheduled,ongoing,completed,cancelled',
+                'is_popular' => 'boolean',
+                'registration_deadline' => 'nullable|date|before:start_date',
+                'image' => 'nullable|string',
+            ]);
+
+            // Find or create city
+            $city = City::firstOrCreate(
+                ['name' => $validated['city_name']],
+                ['is_active' => true]
+            );
+            $validated['city_id'] = $city->id;
+            unset($validated['city_name']);
+
+            // Handle trainer
+            $trainer = \App\Models\Trainer::whereRaw("CONCAT(first_name, ' ', last_name) = ?", [$validated['trainer_name']])->first();
+            if (!$trainer) {
+                $trainer = \App\Models\Trainer::create([
+                    'first_name' => $validated['trainer_name'],
+                    'last_name' => '',
+                    'is_active' => true,
+                ]);
+            }
+            $validated['trainer_id'] = $trainer->id;
+            unset($validated['trainer_name']);
+
+            // Generate slug
+            $validated['slug'] = \Illuminate\Support\Str::slug($validated['title']);
+
+            $training = InPersonTraining::create($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'In-person training created successfully',
+                'data' => $training->load(['category', 'city', 'trainer'])
+            ], 201);
+        }
     }
 
     /**
-     * Update a course
+     * Update a course or in-person training
      */
     public function update(Request $request, $id): JsonResponse
     {
-        $course = Course::findOrFail($id);
+        $mode = $request->get('mode');
 
-        $validated = $request->validate([
-            'title' => 'string|max:255',
-            'description' => 'string',
-            'short_description' => 'string|max:500',
-            'category_id' => 'exists:categories,id',
-            'trainer_id' => 'exists:trainers,id',
-            'level' => 'in:beginner,intermediate,advanced',
-            'type' => 'in:video,live,hybrid',
-            'difficulty' => 'in:easy,medium,hard',
-            'price' => 'numeric|min:0',
-            'original_price' => 'nullable|numeric|min:0',
-            'duration' => 'integer|min:1',
-            'image' => 'nullable|string',
-            'skills' => 'nullable|array',
-            'is_trending' => 'boolean',
-            'is_bestseller' => 'boolean',
-            'is_new' => 'boolean',
-        ]);
+        // Auto-detect mode if not provided
+        if (!$mode) {
+            if ($request->has('city_name') || $request->has('trainer_name')) {
+                $mode = 'in-person';
+            } elseif ($request->has('trainer_id')) {
+                $mode = 'online';
+            } else {
+                $mode = 'online'; // default
+            }
+        }
 
-        $course->update($validated);
+        if ($mode === 'online') {
+            $course = Course::findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Course updated successfully',
-            'data' => $course->fresh()
-        ]);
+            $validated = $request->validate([
+                'title' => 'string|max:255',
+                'description' => 'string',
+                'short_description' => 'string|max:500',
+                'category_id' => 'exists:categories,id',
+                'trainer_id' => 'exists:trainers,id',
+                'level' => 'in:beginner,intermediate,advanced',
+                'type' => 'in:video,live,hybrid',
+                'difficulty' => 'in:easy,medium,hard',
+                'price' => 'numeric|min:0',
+                'original_price' => 'nullable|numeric|min:0',
+                'duration' => 'integer|min:1',
+                'image' => 'nullable|string',
+                'skills' => 'nullable|array',
+                'is_trending' => 'boolean',
+                'is_bestseller' => 'boolean',
+                'is_new' => 'boolean',
+            ]);
+
+            $course->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Course updated successfully',
+                'data' => $course->fresh()
+            ]);
+        } else {
+            $training = InPersonTraining::findOrFail($id);
+
+            $validated = $request->validate([
+                'title' => 'string|max:255',
+                'description' => 'string',
+                'short_description' => 'string|max:500',
+                'category_id' => 'exists:categories,id',
+                'trainer_name' => 'string|max:255',
+                'city_name' => 'string|max:255',
+                'price' => 'numeric|min:0',
+                'original_price' => 'nullable|numeric|min:0',
+                'duration_days' => 'integer|min:1',
+                'start_date' => 'date|after:today',
+                'end_date' => 'date|after_or_equal:start_date',
+                'start_time' => 'date_format:H:i',
+                'end_time' => 'date_format:H:i|after:start_time',
+                'venue_name' => 'string|max:255',
+                'venue_address' => 'string',
+                'max_seats' => 'integer|min:1',
+                'status' => 'in:scheduled,ongoing,completed,cancelled',
+                'is_popular' => 'boolean',
+                'registration_deadline' => 'nullable|date|before:start_date',
+                'image' => 'nullable|string',
+            ]);
+
+            // Handle city update
+            if (isset($validated['city_name'])) {
+                $city = City::firstOrCreate(
+                    ['name' => $validated['city_name']],
+                    ['is_active' => true]
+                );
+                $validated['city_id'] = $city->id;
+                unset($validated['city_name']);
+            }
+
+            // Handle trainer update
+            if (isset($validated['trainer_name'])) {
+                $trainer = \App\Models\Trainer::whereRaw("CONCAT(first_name, ' ', last_name) = ?", [$validated['trainer_name']])->first();
+                if (!$trainer) {
+                    $trainer = \App\Models\Trainer::create([
+                        'first_name' => $validated['trainer_name'],
+                        'last_name' => '',
+                        'is_active' => true,
+                    ]);
+                }
+                $validated['trainer_id'] = $trainer->id;
+                unset($validated['trainer_name']);
+            }
+
+            // Update slug if title changed
+            if (isset($validated['title'])) {
+                $validated['slug'] = \Illuminate\Support\Str::slug($validated['title']);
+            }
+
+            $training->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'In-person training updated successfully',
+                'data' => $training->fresh()->load(['category', 'city', 'trainer'])
+            ]);
+        }
     }
 
     /**
-     * Delete a course
+     * Delete a course or in-person training
      */
-    public function destroy($id): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
-        $course = Course::findOrFail($id);
-        $course->delete();
+        $mode = $request->get('mode');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Course deleted successfully'
-        ]);
+        // Auto-detect mode if not provided
+        if (!$mode) {
+            if (InPersonTraining::find($id)) {
+                $mode = 'in-person';
+            } else {
+                $mode = 'online';
+            }
+        }
+
+        if ($mode === 'online') {
+            $course = Course::findOrFail($id);
+            $course->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Course deleted successfully'
+            ]);
+        } else {
+            $training = InPersonTraining::findOrFail($id);
+            $training->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'In-person training deleted successfully'
+            ]);
+        }
     }
 
     /**

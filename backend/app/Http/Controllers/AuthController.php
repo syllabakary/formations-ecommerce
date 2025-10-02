@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OtpMail;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -72,67 +74,80 @@ class AuthController extends Controller
      */
     public function login(Request $request): JsonResponse
     {
-        try {
-            // Validation des données
-            $validator = Validator::make($request->all(), [
-                'email' => 'required|email',
-                'password' => 'required|string'
-            ]);
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Email et mot de passe requis',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
+        // Vérifier les identifiants
+        $user = User::where('email', $request->email)->first();
 
-            // Vérifier les identifiants
-            $user = User::where('email', $request->email)->first();
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Identifiants incorrects'
+            ], 401);
+        }
 
-            if (!$user || !Hash::check($request->password, $user->password)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Identifiants incorrects'
-                ], 401);
-            }
+        // Vérifier si l'email est vérifié
+        if (!$user->email_verified_at) {
+            // Renvoyer un OTP pour la vérification
+            $otpCode = $this->generateOtp($user->email);
+            $this->sendOtpEmail($user->email, $otpCode);
 
-            // Vérifier si l'email est vérifié
-            if (!$user->email_verified_at) {
-                // Renvoyer un OTP pour la vérification
-                $otpCode = $this->generateOtp($user->email);
-                $this->sendOtpEmail($user->email, $otpCode);
+            return response()->json([
+                'success' => false,
+                'message' => 'Votre compte n\'est pas vérifié. Un code OTP a été envoyé à votre email.',
+                'requires_verification' => true,
+                'user_id' => $user->id,
+                'otp' => $otpCode // Pour dev/test uniquement
+            ], 403);
+        }
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Votre compte n\'est pas vérifié. Un code OTP a été envoyé à votre email.',
-                    'requires_verification' => true,
-                    'user_id' => $user->id,
-                    'otp' => $otpCode // Pour dev/test uniquement
-                ], 403);
-            }
-
-            // Générer le token
-            $token = $user->createToken('auth_token')->plainTextToken;
+        // Pour les admins, utiliser l'authentification par token (SPA)
+        if (in_array($user->role, ['admin', 'Admin', 'administrator', 'Administrator'])) {
+            // Générer le token pour les admins
+            $token = $user->createToken('admin_token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
-                'message' => 'Connexion réussie',
+                'message' => 'Connexion admin réussie',
                 'token' => $token,
                 'user' => [
                     'id' => $user->id,
                     'email' => $user->email,
                     'phone' => $user->phone,
-                    'name' => $user->name
+                    'name' => $user->name,
+                    'role' => $user->role,
                 ]
             ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la connexion: ' . $e->getMessage()
-            ], 500);
         }
+
+        // Pour les autres utilisateurs, utiliser l'authentification par session (Sanctum stateful)
+        if (Auth::attempt([
+            'email' => $request->email,
+            'password' => $request->password
+        ])) {
+            $request->session()->regenerate();
+            $user = Auth::user();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Connexion réussie',
+                'user' => [
+                    'id' => $user->id,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'name' => $user->name,
+                    'role' => $user->role,
+                ]
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur lors de la connexion'
+        ], 401);
     }
 
     /**
@@ -265,12 +280,17 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         try {
-            $request->user()->currentAccessToken()->delete();
+            // Déconnexion de la session
+            Auth::guard('web')->logout();
+            
+            // Invalider la session et régénérer le token CSRF
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Déconnexion réussie'
-            ], 200);
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([

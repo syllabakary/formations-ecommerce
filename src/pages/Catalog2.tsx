@@ -562,18 +562,20 @@ const UnifiedTrainingCatalog = () => {
 
           {/* Compétences */}
           <div className="mb-4">
-            <div className="flex flex-wrap gap-2">
-              {course.skills.slice(0, 3).map((skill, idx) => (
-                <span key={idx} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs">
-                  {skill}
-                </span>
-              ))}
-              {course.skills.length > 3 && (
-                <span className="text-gray-400 text-xs py-1 px-2">
-                  +{course.skills.length - 3}
-                </span>
-              )}
-            </div>
+            {course.skills && Array.isArray(course.skills) && course.skills.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {course.skills.slice(0, 3).map((skill, idx) => (
+                  <span key={idx} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs">
+                    {skill}
+                  </span>
+                ))}
+                {course.skills.length > 3 && (
+                  <span className="text-gray-400 text-xs py-1 px-2">
+                    +{course.skills.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Mode et formateur */}

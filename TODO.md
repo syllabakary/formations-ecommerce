@@ -1,23 +1,23 @@
-# Frontend & Backend Improvements TODO
+# TODO: Fix Login Errors
 
-## Frontend Enhancements
-- [x] Create enhanced fetch wrapper with timeout and AbortController in `src/utils/api.ts`
-- [ ] Modify `src/pages/Catalog.tsx` to load courses and favorites in parallel using Promise.all
-- [ ] Update all optional field access to use consistent `?.` and `||` pattern throughout Catalog.tsx
-a- [ ] Add proper skeleton loader components for loading states
-- [ ] Enhance error handling with better user feedback and recovery options
-- [ ] Update `src/hooks/useApi.tsx` to include timeout functionality
+## Issues Identified
+- CSRF cookie request to `/api/sanctum/csrf-cookie` returns 404 (wrong URL)
+- CSRF cookie request to `/sanctum/csrf-cookie` returns 500 (server error)
+- Login POST to `/api/login` returns 401 (likely due to missing CSRF token)
 
-## Backend Optimizations
-- [ ] Add caching to expensive queries in `backend/app/Http/Controllers/api/TrainingController.php`
-- [ ] Ensure all relationships are eagerly loaded to prevent N+1 queries
-- [ ] Add database indexes if needed for performance
-- [ ] Implement query profiling for slow endpoints in FavoriteController
-- [ ] Optimize polymorphic queries in FavoriteController
+## Plan
+1. Fix CSRF cookie URL in Admin/src/context/AuthProvider.tsx to remove '/api' prefix
+2. Remove duplicate CSRF cookie fetch in AuthProvider.tsx since apiService.login already does it
+3. Investigate and fix 500 error on /sanctum/csrf-cookie in backend
+4. Update CORS config to allow Admin frontend origin
+5. Test login flow
 
-## Testing & Validation
-- [ ] Test parallel loading performance improvement
-- [ ] Verify timeout functionality prevents UI freeze
-- [ ] Check error handling edge cases
-- [ ] Profile backend query performance improvements
-- [ ] Validate consistent optional chaining usage
+## Files to Edit
+- Admin/src/context/AuthProvider.tsx
+- backend/config/cors.php (if needed)
+- backend/config/sanctum.php (check session config)
+
+## Followup
+- Check backend logs for 500 error details
+- Verify session and cookie settings
+- Test authentication flow

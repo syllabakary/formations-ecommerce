@@ -1,453 +1,369 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ExternalLink,
-  Clock,
-  CheckCircle,
-  XCircle,
-  BookOpen,
-  Award,
-  CreditCard,
-  History,
-  User,
-  Settings,
-  Bell,
-  BarChart2,
-  FileText,
-  HelpCircle,
-  LogOut,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Download,
-  Eye,
-  Mail,
-  MessageSquare,
-  Phone
+import { useNavigate } from 'react-router-dom';
+import {
+  ExternalLink, Clock, CheckCircle, XCircle, BookOpen, Award, CreditCard,
+  History, User, Bell, HelpCircle, LogOut, ChevronDown, ChevronUp, Download,
+  Eye, Mail, MessageSquare, Phone, Loader2, AlertCircle, Star, Users, Calendar,
+  MapPin, Building, Wifi, X, Settings, Menu
 } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
-import { Navigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
 
-// Interfaces
-interface ExternalCourse {
-  id: string;
-  title: string;
-  platform: string;
-  purchaseDate: string;
-  accessLink: string;
-  status: 'completed' | 'in-progress' | 'not-started';
-  completionPercentage?: number;
-  expiryDate?: string;
-  price: number;
-  category: string;
-}
-
-interface PurchaseHistory {
-  id: string;
-  date: string;
-  amount: number;
-  items: {
-    courseId: string;
-    title: string;
-    price: number;
-  }[];
-  paymentMethod: string;
-  invoiceNumber: string;
-  invoiceUrl?: string;
-}
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 interface UserProfile {
+  id: number;
   name: string;
   email: string;
-  phone?: string;
-  lastPasswordChange?: string;
+  phone: string;
+  created_at: string;
 }
 
-interface SupportTicket {
-  subject: string;
-  message: string;
-  contactEmail: string;
+interface PurchasedCourse {
+  id: number;
+  course_id: number;
+  title: string;
+  short_description: string;
+  image_url: string;
+  platform: string;
+  access_link: string;
+  category: string;
+  price_fcfa: number;
+  purchase_date: string;
+  status: 'active' | 'completed' | 'expired';
+  progress: number;
+  duration_hours: number;
+  rating: number;
+  total_reviews: number;
+  trainer_name: string;
+  expiry_date?: string;
+}
+
+interface PurchasedTraining {
+  id: number;
+  training_id: number;
+  title: string;
+  short_description: string;
+  image_url: string;
+  venue_name: string;
+  venue_address: string;
+  city_name: string;
+  category: string;
+  price_fcfa: number;
+  registration_date: string;
+  start_date: string;
+  end_date: string;
+  duration_days: number;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  trainer_name: string;
+  trainer_email: string;
+}
+
+interface Purchase {
+  id: number;
+  invoice_number: string;
+  purchase_date: string;
+  total_amount_fcfa: number;
+  payment_method: string;
+  payment_status: string;
+  invoice_url?: string;
+  items: Array<{
+    title: string;
+    type: 'course' | 'training';
+    price_fcfa: number;
+  }>;
 }
 
 const Dashboard = () => {
-  const { user, logout, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'courses' | 'purchases' | 'account' | 'settings' | 'support'>('courses');
-  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
-  const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [purchasedCourses, setPurchasedCourses] = useState<PurchasedCourse[]>([]);
+  const [purchasedTrainings, setPurchasedTrainings] = useState<PurchasedTraining[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const [activeTab, setActiveTab] = useState<'courses' | 'trainings' | 'purchases' | 'account' | 'support'>('courses');
+  const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
+  const [expandedTraining, setExpandedTraining] = useState<number | null>(null);
+  const [expandedPurchase, setExpandedPurchase] = useState<number | null>(null);
   const [editMode, setEditMode] = useState(false);
-  
-  // User profile state
-  const [profile, setProfile] = useState<UserProfile>({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: '',
-    lastPasswordChange: '2024-01-01'
-  });
-  
-  // États pour le formulaire de support
-  const [supportTicket, setSupportTicket] = useState<SupportTicket>({
-    subject: '',
-    message: '',
-    contactEmail: user?.email || ''
-  });
-  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
-  const [ticketSubmitted, setTicketSubmitted] = useState(false);
-  
-  // Form states
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [passwordError, setPasswordError] = useState('');
-  const [profileError, setProfileError] = useState('');
-  const [profileSuccess, setProfileSuccess] = useState('');
-  
-  // Mock data states - in a real app, these would come from API calls
-  const [courses, setCourses] = useState<ExternalCourse[]>([]);
-  const [purchases, setPurchases] = useState<PurchaseHistory[]>([]);
-  
-  // Filter and sort states
-  const [courseFilter, setCourseFilter] = useState<'all' | 'completed' | 'in-progress' | 'not-started'>('all');
-  const [purchaseSort, setPurchaseSort] = useState<'recent' | 'oldest' | 'amount'>('recent');
-  
-  // Fetch data on component mount
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '' });
+  const [supportForm, setSupportForm] = useState({ subject: '', message: '', contact_email: '' });
+  const [submittingSupport, setSubmittingSupport] = useState(false);
+  const [supportSubmitted, setSupportSubmitted] = useState(false);
+
+  const [courseFilter, setCourseFilter] = useState<'all' | 'completed' | 'active' | 'expired'>('all');
+
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        // In a real app, these would be API calls
-        // Simulating API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Mock data
-        const mockCourses: ExternalCourse[] = [
-          {
-            id: '1',
-            title: 'Expert en Marketing Digital',
-            platform: 'Udemy',
-            purchaseDate: '2024-03-15',
-            accessLink: 'https://udemy.com/course123',
-            status: 'in-progress',
-            completionPercentage: 45,
-            expiryDate: '2025-03-15',
-            price: 89.99,
-            category: 'Marketing'
-          },
-          {
-            id: '2',
-            title: 'Data Science Fundamentals',
-            platform: 'Coursera',
-            purchaseDate: '2024-02-10',
-            accessLink: 'https://coursera.org/learn/data-science',
-            status: 'not-started',
-            price: 49.99,
-            category: 'Technologie'
-          },
-          {
-            id: '3',
-            title: 'Leadership Avancé',
-            platform: 'LinkedIn Learning',
-            purchaseDate: '2024-01-05',
-            accessLink: 'https://linkedin.com/learning/leadership',
-            status: 'completed',
-            completionPercentage: 100,
-            price: 29.99,
-            category: 'Management'
-          }
-        ];
-        
-        const mockPurchases: PurchaseHistory[] = [
-          {
-            id: '1',
-            date: '2024-03-15',
-            amount: 89.99,
-            items: [
-              {
-                courseId: '1',
-                title: 'Expert en Marketing Digital',
-                price: 89.99
-              }
-            ],
-            paymentMethod: 'Visa •••• 4242',
-            invoiceNumber: 'INV-2024-03-001',
-            invoiceUrl: 'https://example.com/invoices/INV-2024-03-001'
-          },
-          {
-            id: '2',
-            date: '2024-02-10',
-            amount: 79.98,
-            items: [
-              {
-                courseId: '2',
-                title: 'Data Science Fundamentals',
-                price: 49.99
-              },
-              {
-                courseId: '4',
-                title: 'Introduction à Python',
-                price: 29.99
-              }
-            ],
-            paymentMethod: 'PayPal',
-            invoiceNumber: 'INV-2024-02-005',
-            invoiceUrl: 'https://example.com/invoices/INV-2024-02-005'
-          }
-        ];
-        
-        setCourses(mockCourses);
-        setPurchases(mockPurchases);
-        setProfile({
-          name: user?.name || '',
-          email: user?.email || '',
-          phone: '+33 6 12 34 56 78',
-          lastPasswordChange: '2024-01-01'
+    const userEmail = localStorage.getItem('userEmail');
+    if (userEmail) {
+      loadUserData(userEmail);
+    } else {
+      // Redirect to login page if not authenticated
+      window.location.href = '/';
+    }
+  }, []);
+
+  const loadUserData = async (email: string) => {
+    try {
+      setLoading(true);
+      
+      const [userRes, coursesRes, trainingsRes, purchasesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/v1/users/profile?email=${encodeURIComponent(email)}`),
+        fetch(`${API_BASE_URL}/v1/users/purchased-courses?email=${encodeURIComponent(email)}`),
+        fetch(`${API_BASE_URL}/v1/users/registered-trainings?email=${encodeURIComponent(email)}`),
+        fetch(`${API_BASE_URL}/v1/users/purchases?email=${encodeURIComponent(email)}`)
+      ]);
+
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUser(userData.data);
+        setProfileForm({
+          name: userData.data.name || '',
+          email: userData.data.email || '',
+          phone: userData.data.phone || ''
         });
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setIsLoading(false);
+        setSupportForm(prev => ({ ...prev, contact_email: userData.data.email }));
       }
-    };
+
+      if (coursesRes.ok) {
+        const coursesData = await coursesRes.json();
+        setPurchasedCourses(coursesData.data || []);
+      }
+
+      if (trainingsRes.ok) {
+        const trainingsData = await trainingsRes.json();
+        setPurchasedTrainings(trainingsData.data || []);
+      }
+
+      if (purchasesRes.ok) {
+        const purchasesData = await purchasesRes.json();
+        setPurchases(purchasesData.data || []);
+      }
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError('Impossible de charger vos données. Vérifiez votre connexion.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/users/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user?.email,
+          name: profileForm.name,
+          phone: profileForm.phone
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.data);
+        setSuccess('Profil mis à jour avec succès');
+        setEditMode(false);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        throw new Error('Erreur mise à jour');
+      }
+    } catch (err) {
+      setError('Impossible de mettre à jour le profil');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingSupport(true);
     
-    fetchData();
-  }, [user]);
-  
-  // Filter and sort functions
-  const filteredCourses = courses.filter(course => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/support/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: user?.email,
+          subject: supportForm.subject,
+          message: supportForm.message,
+          contact_email: supportForm.contact_email
+        })
+      });
+
+      if (response.ok) {
+        setSupportSubmitted(true);
+        setSupportForm({ subject: '', message: '', contact_email: user?.email || '' });
+        setTimeout(() => setSupportSubmitted(false), 5000);
+      } else {
+        throw new Error('Erreur envoi');
+      }
+    } catch (err) {
+      setError('Impossible d\'envoyer la demande');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setSubmittingSupport(false);
+    }
+  };
+
+  const handleUpdateProgress = async (courseId: number, newProgress: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/users/course-progress`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user?.email,
+          course_id: courseId,
+          progress: newProgress
+        })
+      });
+
+      if (response.ok) {
+        setPurchasedCourses(prev => prev.map(course => 
+          course.course_id === courseId 
+            ? { ...course, progress: newProgress, status: newProgress === 100 ? 'completed' : 'active' }
+            : course
+        ));
+        setSuccess('Progression mise à jour');
+        setTimeout(() => setSuccess(''), 2000);
+      }
+    } catch (err) {
+      setError('Erreur mise à jour');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, { color: string; icon: any; label: string }> = {
+      active: { color: 'bg-blue-100 text-blue-800', icon: Clock, label: 'En cours' },
+      completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Terminé' },
+      expired: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Expiré' },
+      upcoming: { color: 'bg-purple-100 text-purple-800', icon: Calendar, label: 'À venir' },
+      ongoing: { color: 'bg-blue-100 text-blue-800', icon: Clock, label: 'En cours' },
+      cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircle, label: 'Annulé' }
+    };
+
+    const badge = badges[status] || badges.active;
+    const Icon = badge.icon;
+    return <span className={`px-2 py-1 ${badge.color} text-xs rounded-full inline-flex items-center gap-1`}><Icon className="h-3 w-3" />{badge.label}</span>;
+  };
+
+  const handleLogout = async () => {
+    await fetch('http://localhost:8000/api/logout', {
+      method: 'POST',
+      credentials: 'include'
+    });
+    navigate('/'); // Redirection sans rechargement complet
+  };
+
+  const downloadInvoice = (invoiceUrl: string, invoiceNumber: string) => {
+    if (invoiceUrl) {
+      window.open(invoiceUrl, '_blank');
+    } else {
+      alert(`Téléchargement de la facture ${invoiceNumber}...`);
+    }
+  };
+
+  const filteredCourses = purchasedCourses.filter(course => {
     if (courseFilter === 'all') return true;
     return course.status === courseFilter;
   });
-  
-  const sortedPurchases = [...purchases].sort((a, b) => {
-    if (purchaseSort === 'recent') {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    } else if (purchaseSort === 'oldest') {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    } else {
-      return b.amount - a.amount;
-    }
-  });
-  
-  // Conversion en F CFA (1€ = 655.957 F CFA)
-  const convertToFCFA = (euros: number) => {
-    return (euros * 655.957).toFixed(2);
-  };
-  
-  // Handlers
-  const toggleCourse = (courseId: string) => {
-    setExpandedCourse(expandedCourse === courseId ? null : courseId);
-  };
-  
-  const togglePurchase = (purchaseId: string) => {
-    setExpandedPurchase(expandedPurchase === purchaseId ? null : purchaseId);
-  };
-  
-  const handleMarkAsComplete = (courseId: string) => {
-    setCourses(courses.map(course => 
-      course.id === courseId 
-        ? { ...course, status: 'completed', completionPercentage: 100 } 
-        : course
-    ));
-  };
-  
-  const handleUpdateProgress = (courseId: string, progress: number) => {
-    setCourses(courses.map(course => 
-      course.id === courseId 
-        ? { 
-            ...course, 
-            status: progress === 100 ? 'completed' : 'in-progress',
-            completionPercentage: progress 
-          } 
-        : course
-    ));
-  };
-  
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setProfile(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setPasswordForm(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleProfileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileError('');
-    setProfileSuccess('');
-    
-    try {
-      // Validate phone number
-      if (profile.phone && !/^\+?[0-9\s]+$/.test(profile.phone)) {
-        throw new Error('Numéro de téléphone invalide');
-      }
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Update user in auth context
-      if (user) {
-        updateUser({ ...user, name: profile.name });
-      }
-      
-      setProfileSuccess('Profil mis à jour avec succès');
-      setEditMode(false);
-      
-      // Hide success message after 3 seconds
-      setTimeout(() => setProfileSuccess(''), 3000);
-    } catch (error) {
-      setProfileError(error instanceof Error ? error.message : 'Une erreur est survenue');
-    }
-  };
-  
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError('');
-    
-    try {
-      // Validate
-      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-        throw new Error('Les mots de passe ne correspondent pas');
-      }
-      
-      if (passwordForm.newPassword.length < 8) {
-        throw new Error('Le mot de passe doit contenir au moins 8 caractères');
-      }
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Update last password change
-      setProfile(prev => ({ 
-        ...prev, 
-        lastPasswordChange: new Date().toISOString().split('T')[0] 
-      }));
-      
-      // Reset form
-      setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      
-      setPasswordError('Mot de passe mis à jour avec succès');
-      
-      // Hide message after 3 seconds
-      setTimeout(() => setPasswordError(''), 3000);
-    } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : 'Une erreur est survenue');
-    }
-  };
-  
-  const handleSupportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingTicket(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Reset form
-      setSupportTicket({
-        subject: '',
-        message: '',
-        contactEmail: user?.email || ''
-      });
-      
-      setTicketSubmitted(true);
-    } catch (error) {
-      console.error('Error submitting ticket:', error);
-    } finally {
-      setIsSubmittingTicket(false);
-    }
-  };
-  
-  const downloadInvoice = (invoiceUrl: string, invoiceNumber: string) => {
-    // In a real app, this would download the invoice
-    console.log(`Downloading invoice ${invoiceNumber} from ${invoiceUrl}`);
-    // For demo purposes, we'll just show an alert
-    alert(`Téléchargement de la facture ${invoiceNumber}...`);
-  };
-  
-  const viewInvoice = (invoiceUrl: string, invoiceNumber: string) => {
-    // In a real app, this would open the invoice in a new tab
-    console.log(`Viewing invoice ${invoiceNumber} at ${invoiceUrl}`);
-    // For demo purposes, we'll just show an alert
-    alert(`Ouverture de la facture ${invoiceNumber} dans un nouvel onglet...`);
-    // window.open(invoiceUrl, '_blank');
-  };
-  
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Terminé</span>;
-      case 'in-progress':
-        return <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center gap-1"><Clock className="h-3 w-3" /> En cours</span>;
-      default:
-        return <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full flex items-center gap-1"><BookOpen className="h-3 w-3" /> Non commencé</span>;
-    }
-  };
-  
-  if (!user) return <Navigate to="/login" />;
-  
-  // Calculate stats
+
   const stats = {
-    totalCourses: courses.length,
-    completedCourses: courses.filter(c => c.status === 'completed').length,
-    inProgressCourses: courses.filter(c => c.status === 'in-progress').length,
-    totalSpent: purchases.reduce((sum, purchase) => sum + purchase.amount, 0),
-    activeSubscriptions: 2 // Mock value
+    totalCourses: purchasedCourses.length + purchasedTrainings.length,
+    completedCourses: purchasedCourses.filter(c => c.status === 'completed').length,
+    activeCourses: purchasedCourses.filter(c => c.status === 'active').length,
+    totalSpent: purchases.reduce((sum, p) => sum + p.total_amount_fcfa, 0)
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Chargement de vos données...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-600 mb-4">Veuillez vous connecter</p>
+          <button onClick={() => window.location.href = '/'} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Retour à l'accueil
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Formation Pro</h1>
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-md">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="flex-shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {success && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-md">
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="flex-1">{success}</span>
+          <button onClick={() => setSuccess('')} className="flex-shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      <header className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setMenuOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-100">
+              <Menu className="h-6 w-6 text-gray-600" />
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900">Formation Pro</h1>
+          </div>
           <div className="flex items-center gap-4">
             <button className="p-2 rounded-full hover:bg-gray-100 relative">
               <Bell className="h-5 w-5 text-gray-600" />
               <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
-                <span className="font-semibold">{user.name.substring(0, 1)}</span>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white flex items-center justify-center">
+                <span className="font-semibold">{user.name.substring(0, 1).toUpperCase()}</span>
               </div>
-              <span className="font-medium">{user.name}</span>
+              <span className="font-medium hidden md:block">{user.name}</span>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Quick Stats */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Formations achetées</p>
+                <p className="text-sm text-gray-500">Formations</p>
                 <h3 className="text-2xl font-bold">{stats.totalCourses}</h3>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <BookOpen className="h-6 w-6 text-blue-500" />
-              </div>
+              <div className="p-3 bg-blue-50 rounded-lg"><BookOpen className="h-6 w-6 text-blue-500" /></div>
             </div>
           </div>
           
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Formations terminées</p>
+                <p className="text-sm text-gray-500">Terminées</p>
                 <h3 className="text-2xl font-bold">{stats.completedCourses}</h3>
               </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-500" />
-              </div>
+              <div className="p-3 bg-green-50 rounded-lg"><CheckCircle className="h-6 w-6 text-green-500" /></div>
             </div>
           </div>
           
@@ -455,11 +371,9 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">En cours</p>
-                <h3 className="text-2xl font-bold">{stats.inProgressCourses}</h3>
+                <h3 className="text-2xl font-bold">{stats.activeCourses}</h3>
               </div>
-              <div className="p-3 bg-amber-50 rounded-lg">
-                <Clock className="h-6 w-6 text-amber-500" />
-              </div>
+              <div className="p-3 bg-amber-50 rounded-lg"><Clock className="h-6 w-6 text-amber-500" /></div>
             </div>
           </div>
           
@@ -467,805 +381,497 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Total dépensé</p>
-                <h3 className="text-2xl font-bold">
-                  {stats.totalSpent.toFixed(2)}€
-                  <span className="text-lg text-gray-500 ml-1">
-                    ({convertToFCFA(stats.totalSpent)} F CFA)
-                  </span>
-                </h3>
+                <h3 className="text-lg font-bold">{stats.totalSpent.toLocaleString()} F CFA</h3>
               </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <CreditCard className="h-6 w-6 text-purple-500" />
-              </div>
+              <div className="p-3 bg-purple-50 rounded-lg"><CreditCard className="h-6 w-6 text-purple-500" /></div>
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
-          <div className="lg:w-64 flex-shrink-0">
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {/* Mobile Overlay */}
+          {menuOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden" onClick={() => setMenuOpen(false)} />
+          )}
+
+          {/* Mobile Sidebar */}
+          <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white flex items-center justify-center">
+                    <span className="font-semibold text-lg">{user.name.substring(0, 1).toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate">{user.name}</h3>
+                    <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                  </div>
+                </div>
+                <button onClick={() => setMenuOpen(false)} className="p-2 rounded-lg hover:bg-gray-100">
+                  <X className="h-5 w-5 text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            <nav className="p-4">
+              {[
+                { id: 'courses', icon: Wifi, label: 'Formations en ligne' },
+                { id: 'trainings', icon: Building, label: 'Formations présentiel' },
+                { id: 'purchases', icon: History, label: 'Historique achats' },
+                { id: 'account', icon: User, label: 'Mon Compte' },
+                { id: 'support', icon: HelpCircle, label: 'Support' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => { setActiveTab(tab.id as any); setMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left transition-all ${
+                    activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <tab.icon className="h-5 w-5 flex-shrink-0" />
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              ))}
+
+              <div className="border-t my-2"></div>
+
+              <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-gray-100">
+                <LogOut className="h-5 w-5" />
+                <span>Déconnexion</span>
+              </button>
+            </nav>
+          </div>
+
+          <div className="lg:w-64 hidden lg:block">
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden sticky top-24">
               <div className="p-6 border-b">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center">
-                    <span className="font-semibold text-lg">{user.name.substring(0, 1)}</span>
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white flex items-center justify-center">
+                    <span className="font-semibold text-lg">{user.name.substring(0, 1).toUpperCase()}</span>
                   </div>
-                  <div>
-                    <h3 className="font-medium">{user.name}</h3>
-                    <p className="text-sm text-gray-500">{user.email}</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate">{user.name}</h3>
+                    <p className="text-sm text-gray-500 truncate">{user.email}</p>
                   </div>
                 </div>
               </div>
               
               <nav className="p-4">
-                <button
-                  onClick={() => setActiveTab('courses')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left ${
-                    activeTab === 'courses' ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <BookOpen className="h-5 w-5" />
-                  <span>Mes Formations</span>
-                </button>
-                
-                <button
-                  onClick={() => setActiveTab('purchases')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left ${
-                    activeTab === 'purchases' ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <History className="h-5 w-5" />
-                  <span>Historique d'achats</span>
-                </button>
-                
-                <button
-                  onClick={() => setActiveTab('account')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left ${
-                    activeTab === 'account' ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <User className="h-5 w-5" />
-                  <span>Mon Compte</span>
-                </button>
+                {[
+                  { id: 'courses', icon: Wifi, label: 'Formations en ligne' },
+                  { id: 'trainings', icon: Building, label: 'Formations présentiel' },
+                  { id: 'purchases', icon: History, label: 'Historique achats' },
+                  { id: 'account', icon: User, label: 'Mon Compte' },
+                  { id: 'support', icon: HelpCircle, label: 'Support' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left transition-all ${
+                      activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <tab.icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                ))}
                 
                 <div className="border-t my-2"></div>
                 
-                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left hover:bg-gray-100">
-                  <Settings className="h-5 w-5" />
-                  <span>Paramètres</span>
-                </button>
-                
-               <button
-                  onClick={() => setActiveTab('support')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left ${
-                    activeTab === 'support' ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <HelpCircle className="h-5 w-5" />
-                  <span>Aide & Support</span>
-                </button>
-                
-                <button 
-                  onClick={logout}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 text-left hover:bg-gray-100"
-                >
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-gray-100">
                   <LogOut className="h-5 w-5" />
                   <span>Déconnexion</span>
                 </button>
               </nav>
             </div>
-            
-            {/* Quick Links */}
-            <div className="mt-6 bg-white rounded-xl shadow-sm p-6">
-              <h3 className="font-medium mb-4">Liens rapides</h3>
-              <div className="space-y-3">
-                <a href="#" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary">
-                  <ExternalLink className="h-4 w-4" />
-                  <span>Plateformes partenaires</span>
-                </a>
-                <a href="#" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary">
-                  <Award className="h-4 w-4" />
-                  <span>Certifications disponibles</span>
-                </a>
-                <a href="#" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary">
-                  <BarChart2 className="h-4 w-4" />
-                  <span>Statistiques d'utilisation</span>
-                </a>
-              </div>
-            </div>
           </div>
           
-          {/* Main Content Area */}
-          <div className="flex-1">
-            {isLoading ? (
-              <div className="bg-white rounded-xl shadow-sm p-8 flex justify-center items-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <>
-                {/* Courses Tab */}
-                {activeTab === 'courses' && (
-                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="p-6 border-b">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h2 className="text-xl font-bold">Mes Formations</h2>
-                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                          <select 
-                            value={courseFilter}
-                            onChange={(e) => setCourseFilter(e.target.value as any)}
-                            className="px-3 py-2 border rounded-lg text-sm"
-                          >
-                            <option value="all">Toutes les formations</option>
-                            <option value="completed">Terminées</option>
-                            <option value="in-progress">En cours</option>
-                            <option value="not-started">Non commencées</option>
-                          </select>
-                          <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-opacity-90">
-                            Acheter une nouvelle formation
-                          </button>
-                        </div>
-                      </div>
+          <div className="flex-1 min-w-0">
+            {activeTab === 'courses' && (
+              <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-6 border-b">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold flex items-center gap-2">
+                        <Wifi className="h-6 w-6 text-blue-600" />
+                        Mes Formations en Ligne
+                      </h2>
+                      <p className="text-gray-600 mt-1">{filteredCourses.length} formation(s)</p>
                     </div>
-                    
-                    <div className="divide-y">
-                      {filteredCourses.length > 0 ? (
-                        filteredCourses.map(course => (
-                          <div key={course.id} className="p-6 hover:bg-gray-50">
-                            <div className="flex flex-col md:flex-row justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-start gap-4">
-                                  <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                    {course.platform === 'Udemy' && (
-                                      <span className="text-xs font-bold text-purple-600">UD</span>
-                                    )}
-                                    {course.platform === 'Coursera' && (
-                                      <span className="text-xs font-bold text-blue-600">CO</span>
-                                    )}
-                                    {course.platform === 'LinkedIn Learning' && (
-                                      <span className="text-xs font-bold text-blue-400">LI</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <h3 className="font-medium mb-1">{course.title}</h3>
-                                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 mb-2">
-                                      <span>{course.platform}</span>
-                                      <span>•</span>
-                                      <span>Acheté le {new Date(course.purchaseDate).toLocaleDateString()}</span>
-                                      {course.expiryDate && (
-                                        <>
-                                          <span>•</span>
-                                          <span>Expire le {new Date(course.expiryDate).toLocaleDateString()}</span>
-                                        </>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      {getStatusBadge(course.status)}
-                                      <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-                                        {course.category}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex flex-col items-end gap-3">
-                                <button 
-                                  onClick={() => toggleCourse(course.id)}
-                                  className="text-gray-500 hover:text-gray-700"
-                                >
-                                  {expandedCourse === course.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                                </button>
-                                <a 
-                                  href={course.accessLink} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-opacity-90 flex items-center gap-2"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                  <span>Accéder au cours</span>
-                                </a>
-                              </div>
-                            </div>
-                            
-                            {/* Expanded Course Details */}
-                            <AnimatePresence>
-                              {expandedCourse === course.id && (
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: 'auto' }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  className="mt-4 pt-4 border-t"
-                                >
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div>
-                                      <h4 className="font-medium mb-2">Détails de la formation</h4>
-                                      <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                          <span className="text-gray-500">Plateforme:</span>
-                                          <span>{course.platform}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-gray-500">Date d'achat:</span>
-                                          <span>{new Date(course.purchaseDate).toLocaleDateString()}</span>
-                                        </div>
-                                        {course.expiryDate && (
-                                          <div className="flex justify-between">
-                                            <span className="text-gray-500">Date d'expiration:</span>
-                                            <span>{new Date(course.expiryDate).toLocaleDateString()}</span>
-                                          </div>
-                                        )}
-                                        <div className="flex justify-between">
-                                          <span className="text-gray-500">Prix:</span>
-                                          <span>
-                                            {course.price.toFixed(2)}€
-                                            <span className="text-gray-500 ml-1">
-                                              ({convertToFCFA(course.price)} F CFA)
-                                            </span>
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    <div>
-                                      <h4 className="font-medium mb-2">Progression</h4>
-                                      {course.status === 'completed' ? (
-                                        <div className="flex items-center gap-2 text-green-600">
-                                          <CheckCircle className="h-5 w-5" />
-                                          <span>Formation terminée</span>
-                                        </div>
-                                      ) : course.status === 'in-progress' ? (
-                                        <div>
-                                          <div className="flex justify-between text-sm mb-1">
-                                            <span>Progression:</span>
-                                            <span>{course.completionPercentage}%</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                              className="bg-primary h-2 rounded-full" 
-                                              style={{ width: `${course.completionPercentage}%` }}
-                                            ></div>
-                                          </div>
-                                          <div className="mt-2 flex gap-2">
-                                            <button 
-                                              onClick={() => handleUpdateProgress(course.id, Math.min(100, (course.completionPercentage || 0) + 10))}
-                                              className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
-                                            >
-                                              +10%
-                                            </button>
-                                            <button 
-                                              onClick={() => handleUpdateProgress(course.id, Math.max(0, (course.completionPercentage || 0) - 10))}
-                                              className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
-                                            >
-                                              -10%
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2 text-gray-500">
-                                          <BookOpen className="h-5 w-5" />
-                                          <span>Non commencé</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    <div>
-                                      <h4 className="font-medium mb-2">Actions</h4>
-                                      <div className="space-y-2">
-                                        <a 
-                                          href={course.accessLink} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="block w-full px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-opacity-90 text-center"
-                                        >
-                                          Accéder à la plateforme
-                                        </a>
-                                        <button className="block w-full px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-                                          Obtenir une facture
-                                        </button>
-                                        {course.status !== 'completed' && (
-                                          <button 
-                                            onClick={() => handleMarkAsComplete(course.id)}
-                                            className="block w-full px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-                                          >
-                                            Marquer comme terminé
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-6 text-center text-gray-500">
-                          Aucune formation trouvée avec ce filtre
-                        </div>
-                      )}
-                    </div>
+                    <select 
+                      value={courseFilter}
+                      onChange={(e) => setCourseFilter(e.target.value as any)}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    >
+                      <option value="all">Toutes</option>
+                      <option value="active">En cours</option>
+                      <option value="completed">Terminées</option>
+                      <option value="expired">Expirées</option>
+                    </select>
                   </div>
-                )}
+                </div>
                 
-                {/* Purchases Tab */}
-                {activeTab === 'purchases' && (
-                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="p-6 border-b">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h2 className="text-xl font-bold">Historique d'achats</h2>
-                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                          <select 
-                            value={purchaseSort}
-                            onChange={(e) => setPurchaseSort(e.target.value as any)}
-                            className="px-3 py-2 border rounded-lg text-sm"
-                          >
-                            <option value="recent">Trier par: Plus récent</option>
-                            <option value="oldest">Trier par: Plus ancien</option>
-                            <option value="amount">Trier par: Montant</option>
-                          </select>
-                          <button className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
-                            Exporter en CSV
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="divide-y">
-                      {sortedPurchases.map(purchase => (
-                        <div key={purchase.id} className="p-6 hover:bg-gray-50">
-                          <div className="flex flex-col md:flex-row justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h3 className="font-medium mb-1">Commande #{purchase.invoiceNumber}</h3>
-                                  <div className="flex items-center gap-3 text-sm text-gray-600 mb-2">
-                                    <span>Date: {new Date(purchase.date).toLocaleDateString()}</span>
-                                    <span>•</span>
-                                    <span>Méthode: {purchase.paymentMethod}</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {purchase.items.map((item, index) => (
-                                      <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-                                        {item.title}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                                <button 
-                                  onClick={() => togglePurchase(purchase.id)}
-                                  className="text-gray-500 hover:text-gray-700 md:hidden"
-                                >
-                                  {expandedPurchase === purchase.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                                </button>
-                              </div>
+                <div className="divide-y">
+                  {filteredCourses.length > 0 ? filteredCourses.map(course => (
+                    <div key={course.id} className="p-6 hover:bg-gray-50">
+                      <div className="flex gap-4">
+                        <img src={course.image_url} alt={course.title} className="w-24 h-24 object-cover rounded-lg flex-shrink-0" />
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-lg truncate">{course.title}</h3>
+                              <p className="text-sm text-gray-600 line-clamp-2">{course.short_description}</p>
                             </div>
-                            
-                            <div className="flex flex-col items-end gap-3">
-                              <button 
-                                onClick={() => togglePurchase(purchase.id)}
-                                className="text-gray-500 hover:text-gray-700 hidden md:block"
-                              >
-                                {expandedPurchase === purchase.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                              </button>
-                              <div className="text-right">
-                                <h4 className="text-xl font-bold">
-                                  {purchase.amount.toFixed(2)}€
-                                  <span className="text-gray-500 text-sm ml-1">
-                                    ({convertToFCFA(purchase.amount)} F CFA)
-                                  </span>
-                                </h4>
-                              </div>
-                            </div>
+                            <button onClick={() => setExpandedCourse(expandedCourse === course.id ? null : course.id)} className="ml-2 flex-shrink-0">
+                              {expandedCourse === course.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                            </button>
                           </div>
                           
-                          {/* Expanded Purchase Details */}
-                          <AnimatePresence>
-                            {expandedPurchase === purchase.id && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mt-4 pt-4 border-t"
-                              >
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div>
-                                    <h4 className="font-medium mb-2">Détails de la commande</h4>
-                                    <div className="space-y-3">
-                                      {purchase.items.map((item, index) => (
-                                        <div key={index} className="flex justify-between text-sm">
-                                          <span className="text-gray-600">{item.title}</span>
-                                          <span className="font-medium">
-                                            {item.price.toFixed(2)}€
-                                            <span className="text-gray-500 ml-1">
-                                              ({convertToFCFA(item.price)} F CFA)
-                                            </span>
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  
-                                  <div>
-                                    <h4 className="font-medium mb-2">Actions</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                      {purchase.invoiceUrl && (
-                                        <>
-                                          <button 
-                                            onClick={() => viewInvoice(purchase.invoiceUrl!, purchase.invoiceNumber)}
-                                            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                            <span>Voir la facture</span>
-                                          </button>
-                                          <button 
-                                            onClick={() => downloadInvoice(purchase.invoiceUrl!, purchase.invoiceNumber)}
-                                            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"
-                                          >
-                                            <Download className="h-4 w-4" />
-                                            <span>Télécharger</span>
-                                          </button>
-                                        </>
-                                      )}
-                                      <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-                                        Contacter le support
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Account Tab */}
-                {activeTab === 'account' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
-                      <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold">Informations personnelles</h2>
-                        {!editMode ? (
-                          <button 
-                            onClick={() => setEditMode(true)}
-                            className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
-                          >
-                            Modifier le profil
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => setEditMode(false)}
-                            className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
-                          >
-                            Annuler
-                          </button>
-                        )}
-                      </div>
-                      
-                      {profileError && (
-                        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
-                          {profileError}
-                        </div>
-                      )}
-                      
-                      {profileSuccess && (
-                        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg text-sm">
-                          {profileSuccess}
-                        </div>
-                      )}
-                      
-                      <form onSubmit={handleProfileSubmit}>
-                        <div className="space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                              {editMode ? (
-                                <input 
-                                  type="text" 
-                                  name="name"
-                                  value={profile.name.split(' ')[0]} 
-                                  onChange={handleProfileChange}
-                                  className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                                  required
-                                />
-                              ) : (
-                                <div className="px-4 py-2 border border-transparent rounded-lg">
-                                  {profile.name.split(' ')[0]}
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                              {editMode ? (
-                                <input 
-                                  type="text" 
-                                  name="lastName"
-                                  value={profile.name.split(' ')[1] || ''} 
-                                  onChange={(e) => setProfile({...profile, name: `${profile.name.split(' ')[0]} ${e.target.value}`})}
-                                  className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                                />
-                              ) : (
-                                <div className="px-4 py-2 border border-transparent rounded-lg">
-                                  {profile.name.split(' ')[1] || ''}
-                                </div>
-                              )}
-                            </div>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {getStatusBadge(course.status)}
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">{course.category}</span>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">{course.platform}</span>
                           </div>
                           
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            {editMode ? (
-                              <input 
-                                type="email" 
-                                name="email"
-                                value={profile.email} 
-                                onChange={handleProfileChange}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                                required
-                              />
-                            ) : (
-                              <div className="px-4 py-2 border border-transparent rounded-lg">
-                                {profile.email}
+                          {course.status === 'active' && (
+                            <div className="mb-3">
+                              <div className="flex justify-between text-sm mb-1">
+                                <span>Progression</span>
+                                <span>{course.progress}%</span>
                               </div>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                            {editMode ? (
-                              <input 
-                                type="tel" 
-                                name="phone"
-                                value={profile.phone || ''} 
-                                onChange={handleProfileChange}
-                                placeholder="+33 6 12 34 56 78" 
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                              />
-                            ) : (
-                              <div className="px-4 py-2 border border-transparent rounded-lg">
-                                {profile.phone || 'Non renseigné'}
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${course.progress}%` }} />
                               </div>
-                            )}
-                          </div>
-                          
-                          {editMode && (
-                            <div className="pt-4 border-t">
-                              <button 
-                                type="submit"
-                                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90"
-                              >
-                                Enregistrer les modifications
-                              </button>
                             </div>
                           )}
-                        </div>
-                      </form>
-                    </div>
-                    
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                      <h2 className="text-xl font-bold mb-6">Sécurité</h2>
-                      
-                      <div className="space-y-4">
-                        <div className="p-4 border rounded-lg">
-                          <h3 className="font-medium mb-2">Mot de passe</h3>
-                          <p className="text-sm text-gray-600 mb-3">
-                            Dernière modification le {profile.lastPasswordChange ? new Date(profile.lastPasswordChange).toLocaleDateString() : 'inconnue'}
-                          </p>
                           
-                          <form onSubmit={handlePasswordSubmit} className="space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            <a href={course.access_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg text-sm">
+                              <ExternalLink className="h-4 w-4" />
+                              Accéder
+                            </a>
+                            <span className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
+                              {course.price_fcfa.toLocaleString()} F CFA
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {expandedCourse === course.id && (
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe actuel</label>
-                              <input 
-                                type="password" 
-                                name="currentPassword"
-                                value={passwordForm.currentPassword}
-                                onChange={handlePasswordChange}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary text-sm"
-                                required
-                              />
+                              <p className="text-gray-500">Acheté le: <span className="text-gray-900">{new Date(course.purchase_date).toLocaleDateString('fr-FR')}</span></p>
+                              <p className="text-gray-500">Durée: <span className="text-gray-900">{course.duration_hours}h</span></p>
+                              <p className="text-gray-500">Formateur: <span className="text-gray-900">{course.trainer_name}</span></p>
                             </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe</label>
-                              <input 
-                                type="password" 
-                                name="newPassword"
-                                value={passwordForm.newPassword}
-                                onChange={handlePasswordChange}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary text-sm"
-                                required
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Confirmer le nouveau mot de passe</label>
-                              <input 
-                                type="password" 
-                                name="confirmPassword"
-                                value={passwordForm.confirmPassword}
-                                onChange={handlePasswordChange}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary text-sm"
-                                required
-                              />
-                            </div>
-                            
-                            {passwordError && (
-                              <div className={`text-sm ${passwordError.includes('succès') ? 'text-green-600' : 'text-red-600'}`}>
-                                {passwordError}
+                            {course.status === 'active' && (
+                              <div className="flex gap-2">
+                                <button onClick={() => handleUpdateProgress(course.course_id, Math.min(100, course.progress + 10))} className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                                  +10%
+                                </button>
+                                <button onClick={() => handleUpdateProgress(course.course_id, 100)} className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">
+                                  Terminer
+                                </button>
                               </div>
                             )}
-                            
-                            <button 
-                              type="submit"
-                              className="w-full px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-opacity-90"
-                            >
-                              Modifier le mot de passe
-                            </button>
-                          </form>
+                          </div>
                         </div>
+                      )}
+                    </div>
+                  )) : (
+                    <div className="p-12 text-center text-gray-500">
+                      <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>Aucune formation avec ce filtre</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'trainings' && (
+              <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-6 border-b">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Building className="h-6 w-6 text-purple-600" />
+                    Formations en Présentiel
+                  </h2>
+                  <p className="text-gray-600 mt-1">{purchasedTrainings.length} inscription(s)</p>
+                </div>
+                
+                <div className="divide-y">
+                  {purchasedTrainings.length > 0 ? purchasedTrainings.map(training => (
+                    <div key={training.id} className="p-6 hover:bg-gray-50">
+                      <div className="flex gap-4">
+                        <img src={training.image_url} alt={training.title} className="w-24 h-24 object-cover rounded-lg" />
                         
-                        <div className="p-4 border rounded-lg">
-                          <h3 className="font-medium mb-2">Authentification à deux facteurs</h3>
-                          <p className="text-sm text-gray-600 mb-3">Non activée</p>
-                          <button className="text-sm text-primary font-medium hover:underline">
-                            Activer la 2FA
-                          </button>
-                        </div>
-                        
-                        <div className="p-4 border rounded-lg">
-                          <h3 className="font-medium mb-2">Sessions actives</h3>
-                          <p className="text-sm text-gray-600 mb-3">1 appareil connecté</p>
-                          <button className="text-sm text-primary font-medium hover:underline">
-                            Voir toutes les sessions
-                          </button>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg mb-2">{training.title}</h3>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {getStatusBadge(training.status)}
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">{training.category}</span>
+                          </div>
+                          
+                          <div className="space-y-1 text-sm text-gray-600 mb-3">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4" />
+                              <span>{training.city_name} - {training.venue_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              <span>{new Date(training.start_date).toLocaleDateString('fr-FR')} - {new Date(training.end_date).toLocaleDateString('fr-FR')}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              <span>{training.trainer_name}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-lg font-bold text-purple-600">
+                            {training.price_fcfa.toLocaleString()} F CFA
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )) : (
+                    <div className="p-12 text-center text-gray-500">
+                      <Building className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>Aucune formation en présentiel</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'purchases' && (
+              <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-6 border-b">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <History className="h-6 w-6 text-green-600" />
+                    Historique des Achats
+                  </h2>
+                  <p className="text-gray-600 mt-1">{purchases.length} transaction(s)</p>
+                </div>
                 
-                {/* Support Tab */}
-                {activeTab === 'support' && (
-                  <div className="bg-white rounded-xl shadow-sm p-6">
-                    <h2 className="text-xl font-bold mb-6">Aide & Support</h2>
-                    
-                    {ticketSubmitted ? (
-                      <div className="p-6 text-center">
-                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                          <CheckCircle className="h-6 w-6 text-green-600" />
+                <div className="divide-y">
+                  {purchases.length > 0 ? purchases.map(purchase => (
+                    <div key={purchase.id} className="p-6 hover:bg-gray-50">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg">#{purchase.invoice_number}</h3>
+                          <p className="text-sm text-gray-600">{new Date(purchase.purchase_date).toLocaleDateString('fr-FR')}</p>
+                          <p className="text-sm text-gray-600">{purchase.payment_method}</p>
                         </div>
-                        <h3 className="mt-3 text-lg font-medium text-gray-900">Demande envoyée</h3>
-                        <p className="mt-2 text-sm text-gray-500">
-                          Nous avons bien reçu votre demande. Notre équipe vous répondra dans les plus brefs délais.
-                        </p>
-                        <button
-                          onClick={() => setTicketSubmitted(false)}
-                          className="mt-6 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-opacity-90"
-                        >
-                          Nouvelle demande
-                        </button>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold">{purchase.total_amount_fcfa.toLocaleString()} F CFA</div>
+                          <span className={`inline-block px-2 py-1 text-xs rounded-full mt-2 ${
+                            purchase.payment_status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {purchase.payment_status === 'completed' ? 'Payé' : 'En attente'}
+                          </span>
+                        </div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                          <div className="p-4 border rounded-lg">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Mail className="h-5 w-5 text-primary" />
-                              <h3 className="font-medium">Email</h3>
+                      
+                      <div className="space-y-2 mb-4">
+                        {purchase.items.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                            <div className="flex items-center gap-2">
+                              {item.type === 'course' ? <Wifi className="h-4 w-4 text-blue-600" /> : <Building className="h-4 w-4 text-purple-600" />}
+                              <span>{item.title}</span>
                             </div>
-                            <p className="text-sm text-gray-600 mb-3">
-                              Envoyez-nous un email pour toute question
-                            </p>
-                            <a 
-                              href="mailto:support@formationpro.com" 
-                              className="text-sm text-primary font-medium hover:underline"
-                            >
-                              support@formationpro.com
-                            </a>
+                            <span className="font-medium">{item.price_fcfa.toLocaleString()} F CFA</span>
                           </div>
-                          
-                          <div className="p-4 border rounded-lg">
-                            <div className="flex items-center gap-3 mb-2">
-                              <MessageSquare className="h-5 w-5 text-primary" />
-                              <h3 className="font-medium">Chat en direct</h3>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-3">
-                              Discutez en direct avec notre équipe
-                            </p>
-                            <button className="text-sm text-primary font-medium hover:underline">
-                              Ouvrir le chat
-                            </button>
-                          </div>
-                          
-                          <div className="p-4 border rounded-lg">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Phone className="h-5 w-5 text-primary" />
-                              <h3 className="font-medium">Téléphone</h3>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-3">
-                              Du lundi au vendredi, 9h-18h
-                            </p>
-                            <a 
-                              href="tel:+33123456789" 
-                              className="text-sm text-primary font-medium hover:underline"
-                            >
-                              +33 1 23 45 67 89
-                            </a>
-                          </div>
+                        ))}
+                      </div>
+                      
+                      {purchase.invoice_url && (
+                        <div className="flex gap-2">
+                          <button onClick={() => downloadInvoice(purchase.invoice_url!, purchase.invoice_number)} className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm">
+                            <Download className="h-4 w-4" />
+                            Télécharger facture
+                          </button>
                         </div>
-                        
-                        <h3 className="font-medium mb-4">Envoyer une demande</h3>
-                        <form onSubmit={handleSupportSubmit}>
-                          <div className="space-y-4">
-                            <div>
-                              <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
-                                Sujet
-                              </label>
-                              <input
-                                type="text"
-                                id="subject"
-                                name="subject"
-                                value={supportTicket.subject}
-                                onChange={(e) => setSupportTicket({...supportTicket, subject: e.target.value})}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                                required
-                              />
-                            </div>
-                            
-                            <div>
-                              <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
-                                Message
-                              </label>
-                              <textarea
-                                id="message"
-                                name="message"
-                                rows={4}
-                                value={supportTicket.message}
-                                onChange={(e) => setSupportTicket({...supportTicket, message: e.target.value})}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                                required
-                              ></textarea>
-                            </div>
-                            
-                            <div>
-                              <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-1">
-                                Email de contact
-                              </label>
-                              <input
-                                type="email"
-                                id="contactEmail"
-                                name="contactEmail"
-                                value={supportTicket.contactEmail}
-                                onChange={(e) => setSupportTicket({...supportTicket, contactEmail: e.target.value})}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
-                                required
-                              />
-                            </div>
-                            
-                            <div className="pt-2">
-                              <button 
-                                type="submit"
-                                disabled={isSubmittingTicket}
-                                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 disabled:opacity-70"
-                              >
-                                {isSubmittingTicket ? 'Envoi en cours...' : 'Envoyer la demande'}
-                              </button>
-                            </div>
-                          </div>
-                        </form>
-                      </>
+                      )}
+                    </div>
+                  )) : (
+                    <div className="p-12 text-center text-gray-500">
+                      <History className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>Aucun achat pour le moment</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'account' && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold">Mon Compte</h2>
+                  <button onClick={() => setEditMode(!editMode)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                    {editMode ? 'Annuler' : 'Modifier'}
+                  </button>
+                </div>
+                
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Nom complet</label>
+                    {editMode ? (
+                      <input 
+                        type="text" 
+                        value={profileForm.name} 
+                        onChange={(e) => setProfileForm({...profileForm, name: e.target.value})} 
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                        required 
+                      />
+                    ) : (
+                      <div className="px-4 py-2 bg-gray-50 rounded-lg">{profileForm.name}</div>
                     )}
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <div className="px-4 py-2 bg-gray-100 rounded-lg text-gray-600">
+                      {profileForm.email}
+                      <span className="text-xs ml-2">(non modifiable)</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Téléphone</label>
+                    {editMode ? (
+                      <input 
+                        type="tel" 
+                        value={profileForm.phone} 
+                        onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} 
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                        placeholder="+225 XX XX XX XX XX"
+                      />
+                    ) : (
+                      <div className="px-4 py-2 bg-gray-50 rounded-lg">{profileForm.phone || 'Non renseigné'}</div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Membre depuis</label>
+                    <div className="px-4 py-2 bg-gray-50 rounded-lg">
+                      {new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </div>
+                  </div>
+                  
+                  {editMode && (
+                    <button type="submit" className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all">
+                      Enregistrer les modifications
+                    </button>
+                  )}
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'support' && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold mb-6">Aide & Support</h2>
+                
+                {supportSubmitted ? (
+                  <div className="p-6 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <h3 className="mt-3 text-lg font-medium">Demande envoyée</h3>
+                    <p className="mt-2 text-sm text-gray-500">
+                      Notre équipe vous répondra dans les plus brefs délais
+                    </p>
+                    <button onClick={() => setSupportSubmitted(false)} className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                      Nouvelle demande
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Mail className="h-5 w-5 text-blue-600" />
+                          <h3 className="font-medium">Email</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">Contactez-nous par email</p>
+                        <a href="mailto:support@formationpro.com" className="text-sm text-blue-600 hover:underline">
+                          support@formationpro.com
+                        </a>
+                      </div>
+                      
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-3 mb-2">
+                          <MessageSquare className="h-5 w-5 text-green-600" />
+                          <h3 className="font-medium">WhatsApp</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">Discutez avec nous</p>
+                        <a href="https://wa.me/2250000000000" target="_blank" rel="noopener noreferrer" className="text-sm text-green-600 hover:underline">
+                          +225 00 00 00 00 00
+                        </a>
+                      </div>
+                      
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Phone className="h-5 w-5 text-purple-600" />
+                          <h3 className="font-medium">Téléphone</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">Lun-Ven: 8h-18h</p>
+                        <a href="tel:+2250000000000" className="text-sm text-purple-600 hover:underline">
+                          +225 00 00 00 00 00
+                        </a>
+                      </div>
+                    </div>
+                    
+                    <h3 className="font-medium mb-4">Envoyer une demande</h3>
+                    <form onSubmit={handleSupportSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Sujet</label>
+                        <input
+                          type="text"
+                          value={supportForm.subject}
+                          onChange={(e) => setSupportForm({...supportForm, subject: e.target.value})}
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Message</label>
+                        <textarea
+                          rows={4}
+                          value={supportForm.message}
+                          onChange={(e) => setSupportForm({...supportForm, message: e.target.value})}
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Email de contact</label>
+                        <input
+                          type="email"
+                          value={supportForm.contact_email}
+                          onChange={(e) => setSupportForm({...supportForm, contact_email: e.target.value})}
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      
+                      <button 
+                        type="submit"
+                        disabled={submittingSupport}
+                        className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+                      >
+                        {submittingSupport ? 'Envoi en cours...' : 'Envoyer la demande'}
+                      </button>
+                    </form>
+                  </>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
-        
-        {/* Footer */}
+
         <footer className="mt-12 py-6 border-t text-center text-gray-500 text-sm">
           <p>© 2025 Formation Pro. Tous droits réservés.</p>
         </footer>

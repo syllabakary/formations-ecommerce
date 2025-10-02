@@ -22,7 +22,7 @@ class InPersonTrainingController extends Controller
      */
     public function index(Request $request)
     {
-        $query = InPersonTraining::with(['category:id,name', 'trainer:id,name', 'city:id,name']);
+        $query = InPersonTraining::with(['category:id,name', 'trainer', 'city:id,name']);
 
         // Recherche
         if ($request->has('search') && !empty($request->search)) {
@@ -134,8 +134,20 @@ class InPersonTrainingController extends Controller
     {
         $validated = $request->validated();
 
-        // Store trainer_name directly as plain text
-        // trainer_id is optional and can be null
+        // Auto-create trainer if not exists
+        // Split full name into first_name and last_name
+        $names = explode(' ', $validated['trainer_name'], 2);
+        $firstName = $names[0];
+        $lastName = $names[1] ?? '';
+
+        // Provide default email to satisfy NOT NULL constraint
+        $defaultEmail = strtolower($firstName) . '.' . strtolower($lastName) . '@example.com';
+
+        $trainer = \App\Models\Trainer::firstOrCreate(
+            ['first_name' => $firstName, 'last_name' => $lastName],
+            ['email' => $defaultEmail, 'is_active' => true]
+        );
+        $validated['trainer_id'] = $trainer->id;
 
         // Find or create city by name
         $city = City::firstOrCreate(
@@ -160,7 +172,7 @@ class InPersonTrainingController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Formation en présentiel créée avec succès',
-            'data' => $training->load(['category:id,name', 'trainer:id,name', 'city:id,name'])
+            'data' => $training->load(['category:id,name', 'trainer', 'city:id,name'])
         ], 201);
     }
 
@@ -169,7 +181,7 @@ class InPersonTrainingController extends Controller
      */
     public function show(InPersonTraining $inPersonTraining)
     {
-        $inPersonTraining->load(['category:id,name', 'trainer:id,name', 'city:id,name']);
+        $inPersonTraining->load(['category:id,name', 'trainer', 'city:id,name']);
 
         return response()->json([
             'success' => true,
@@ -214,6 +226,32 @@ class InPersonTrainingController extends Controller
     {
         $validated = $request->validated();
 
+        // Auto-create trainer if not exists
+        if (isset($validated['trainer_name'])) {
+            // Split full name into first_name and last_name
+            $names = explode(' ', $validated['trainer_name'], 2);
+            $firstName = $names[0];
+            $lastName = $names[1] ?? '';
+
+            // Provide default email to satisfy NOT NULL constraint
+            $defaultEmail = strtolower($firstName) . '.' . strtolower($lastName) . '@example.com';
+
+            $trainer = \App\Models\Trainer::firstOrCreate(
+                ['first_name' => $firstName, 'last_name' => $lastName],
+                ['email' => $defaultEmail, 'is_active' => true]
+            );
+            $validated['trainer_id'] = $trainer->id;
+        }
+
+        // Auto-create city if not exists
+        if (isset($validated['city_name'])) {
+            $city = \App\Models\City::firstOrCreate(
+                ['name' => $validated['city_name']],
+                ['is_active' => true]
+            );
+            $validated['city_id'] = $city->id;
+        }
+
         // Traitement de l'image
         if ($request->hasFile('image')) {
             // Supprimer l'ancienne image
@@ -233,7 +271,7 @@ class InPersonTrainingController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Formation mise à jour avec succès',
-            'data' => $inPersonTraining->fresh()->load(['category:id,name', 'trainer:id,name', 'city:id,name'])
+            'data' => $inPersonTraining->fresh()->load(['category:id,name', 'trainer', 'city:id,name'])
         ]);
     }
 
@@ -264,7 +302,7 @@ class InPersonTrainingController extends Controller
     }
 
     /**
-     * Basculer le statut
+     * Basculer le statut actif/inactif
      */
     public function toggleStatus(InPersonTraining $inPersonTraining)
     {
@@ -273,6 +311,32 @@ class InPersonTrainingController extends Controller
         return response()->json([
             'success' => true,
             'message' => $inPersonTraining->is_active ? 'Formation activée' : 'Formation désactivée',
+            'data' => $inPersonTraining->fresh()
+        ]);
+    }
+
+    /**
+     * Changer le statut de la formation (scheduled, ongoing, completed, cancelled)
+     */
+    public function updateStatus(Request $request, InPersonTraining $inPersonTraining)
+    {
+        $request->validate([
+            'status' => 'required|in:scheduled,ongoing,completed,cancelled'
+        ]);
+
+        $oldStatus = $inPersonTraining->status;
+        $inPersonTraining->update(['status' => $request->status]);
+
+        $statusLabels = [
+            'scheduled' => 'programmée',
+            'ongoing' => 'en cours',
+            'completed' => 'terminée',
+            'cancelled' => 'annulée'
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => "Formation marquée comme {$statusLabels[$request->status]}",
             'data' => $inPersonTraining->fresh()
         ]);
     }

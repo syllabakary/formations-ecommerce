@@ -123,12 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('🔑 Tentative de connexion pour:', credentials.email);
 
-      // Obtenir le token CSRF pour Laravel Sanctum
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/sanctum/csrf-cookie`, {
-        credentials: 'include',
-      });
-
-      // Utiliser l'apiService pour la connexion
+      // Utiliser l'apiService pour la connexion (CSRF géré dans apiService.login)
       const response = await apiService.login(credentials.email, credentials.password);
 
       if (response?.token && response?.user) {

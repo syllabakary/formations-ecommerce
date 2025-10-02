@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\Admin\CourseController as AdminCourseController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\TrainerController as AdminTrainerController;
 use App\Http\Controllers\Admin\InPersonTrainingController as AdminInPersonTrainingController;
+use App\Http\Controllers\Api\InPersonTrainingController;
 use App\Http\Controllers\Admin\EnrollmentController as AdminEnrollmentController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
@@ -60,11 +61,9 @@ Route::prefix('v1')->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
     Route::get('/dashboard/popular-trainings', [DashboardController::class, 'getPopularTrainings']);
 
-    // Favorites (nécessite auth)
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/favorites', [FavoriteController::class, 'index']);
-        Route::post('/favorites/toggle', [FavoriteController::class, 'toggle']);
-    });
+    // Favorites (utilise email comme identifiant)
+    Route::get('/favorites', [FavoriteController::class, 'index']);
+    Route::post('/favorites/toggle', [FavoriteController::class, 'toggle']);
 });
 
 /*
@@ -154,6 +153,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
             Route::delete('/{training}', [AdminInPersonTrainingController::class, 'destroy']);
             Route::post('/{training}/duplicate', [AdminInPersonTrainingController::class, 'duplicate']);
             Route::patch('/{training}/toggle-status', [AdminInPersonTrainingController::class, 'toggleStatus']);
+            Route::patch('/{training}/update-status', [AdminInPersonTrainingController::class, 'updateStatus']);
         });
 
         // Trainers/Formateurs

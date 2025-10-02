@@ -11,6 +11,7 @@ import Settings from './components/Settings';
 import Documentation from './components/Documentation';
 import CategoryManagement from './components/admin/CategoryManagement';
 import LoginModal from './components/LoginModal';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Composant App principal avec AuthProvider
 function App() {
@@ -119,9 +120,11 @@ function App() {
   };
 
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

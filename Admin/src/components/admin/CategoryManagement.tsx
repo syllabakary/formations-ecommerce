@@ -46,129 +46,7 @@ interface CategoryFormData {
   sort_order: number;
 }
 
-// Service API pour les catégories - Version corrigée avec authentification
-class CategoryApiService {
-  private baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-  private getAuthToken(): string | null {
-    // Utiliser la même clé que l'AuthProvider
-    const tokenKey = import.meta.env.VITE_ADMIN_TOKEN_KEY || 'auth_token';
-    return localStorage.getItem(tokenKey) || sessionStorage.getItem(tokenKey);
-  }
-
-  private async getCSRFToken() {
-    try {
-      await fetch(`${this.baseURL.replace('/api/v1','')}/sanctum/csrf-cookie`, {
-        credentials: 'include',
-      });
-    } catch (error) {
-      console.warn('CSRF token fetch failed:', error);
-    }
-  }
-
-  private async makeRequest(url: string, options: RequestInit = {}) {
-    try {
-      // Obtenir le token d'authentification
-      const token = this.getAuthToken();
-      
-      if (!token) {
-        throw new Error('Token d\'authentification manquant. Veuillez vous reconnecter.');
-      }
-
-      // Obtenir le token CSRF pour les requêtes de modification
-      if (options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method)) {
-        await this.getCSRFToken();
-      }
-
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`, // Important : ajouter le token Bearer
-        ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-        ...options.headers,
-      };
-
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        credentials: 'include', // Important pour Sanctum
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        let errorMessage = `Erreur ${response.status}: ${response.statusText}`;
-        
-        if (text) {
-          try {
-            const data = JSON.parse(text);
-            errorMessage = data.message || errorMessage;
-          } catch (e) {
-            errorMessage = text;
-          }
-        }
-
-        // Si 401, nettoyer le token et forcer une reconnexion
-        if (response.status === 401) {
-          const tokenKey = import.meta.env.VITE_ADMIN_TOKEN_KEY || 'auth_token';
-          localStorage.removeItem(tokenKey);
-          localStorage.removeItem('currentUser');
-          sessionStorage.removeItem(tokenKey);
-          
-          // Recharger la page pour forcer la reconnexion
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-          
-          throw new Error('Session expirée. Reconnexion en cours...');
-        }
-
-        throw new Error(errorMessage);
-      }
-
-      const text = await response.text();
-      return text ? JSON.parse(text) : {};
-      
-    } catch (error) {
-      console.error('Erreur dans makeRequest:', error);
-      throw error;
-    }
-  }
-
-  // Méthodes de l'API
-  async getCategories() {
-    return this.makeRequest(`${this.baseURL}/admin/categories`);
-  }
-
-  async createCategory(data: CategoryFormData) {
-    return this.makeRequest(`${this.baseURL}/admin/categories`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCategory(id: number, data: CategoryFormData) {
-    return this.makeRequest(`${this.baseURL}/admin/categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteCategory(id: number) {
-    return this.makeRequest(`${this.baseURL}/admin/categories/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async toggleStatus(id: number) {
-    return this.makeRequest(`${this.baseURL}/admin/categories/${id}/toggle-status`, {
-      method: 'PATCH',
-    });
-  }
-
-  // Méthode de test pour vérifier l'authentification
-  async testAuth() {
-    return this.makeRequest(`${this.baseURL}/admin/test-auth`);
-  }
-}
 
 // Modal de création/édition de catégorie
 const CategoryModal = ({ 
@@ -437,7 +315,7 @@ const CategoryManagement = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const apiServiceLocal = new CategoryApiService();
+
 
   // Charger les catégories avec vérification d'authentification
   const loadCategories = async () => {
@@ -474,11 +352,11 @@ const CategoryManagement = () => {
     try {
       let response;
       if (editingCategory) {
-        response = await apiServiceLocal.updateCategory(editingCategory.id, formData);
+        response = await apiService.updateCategory(editingCategory.id, formData);
       } else {
-        response = await apiServiceLocal.createCategory(formData);
+        response = await apiService.createCategory(formData);
       }
-      
+
       if (response.success) {
         await loadCategories();
         setShowModal(false);
@@ -505,8 +383,8 @@ const CategoryManagement = () => {
 
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer la catégorie "${category.name}" ?`)) {
       try {
-        const response = await apiServiceLocal.deleteCategory(category.id);
-        
+        const response = await apiService.deleteCategory(category.id);
+
         if (response.success) {
           await loadCategories();
           setSuccess('Catégorie supprimée avec succès');
@@ -525,8 +403,8 @@ const CategoryManagement = () => {
   // Basculer le statut
   const handleToggleStatus = async (category: Category) => {
     try {
-      const response = await apiServiceLocal.toggleStatus(category.id);
-      
+      const response = await apiService.toggleCategoryStatus(category.id);
+
       if (response.success) {
         await loadCategories();
         setSuccess(response.message || 'Statut mis à jour');

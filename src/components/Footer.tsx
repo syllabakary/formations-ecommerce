@@ -11,11 +11,12 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-16">
           <div>
-          <img 
-  src="Public/asset/LOGO EMPOWER FORMATION/LOGO EF - 1 - blanc.png" 
+          <img
+  src="./asset/logos/logo-ef-1-blanc.png"
   alt="Logo Empower Formation"
   className="h-auto w-auto max-h-14 md:max-h-20 lg:max-h-24 object-contain"
-/>            <p className="text-gray-400 mb-6">
+/>
+            <p className="text-gray-400 mb-6">
               La plateforme de formation qui transforme la jeunesse africaine en professionnels qualifiés pour le monde de demain.
             </p>
             <div className="flex space-x-4">

@@ -39,6 +39,8 @@ class Course extends Model
         'category_id',
         'trainer_id',
         'trainer_name',
+        'access_link',
+        'video_url',
     ];
 
     protected $casts = [

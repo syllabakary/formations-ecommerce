@@ -1,12 +1,12 @@
 // utils/api.ts
 export const API_ENDPOINTS = {
-  TRAININGS: '/courses',
-  TRAINING_DETAIL: (id: string | number) => `/courses/${id}`,
-  TRAINING_FILTERS: '/courses/filters/data',
-  REGISTRATIONS: '/registrations',
-  CHECK_AVAILABILITY: (id: string | number) => `/courses/${id}/availability`,
-  DASHBOARD_STATS: '/dashboard/stats',
-  POPULAR_TRAININGS: '/dashboard/popular-trainings'
+  TRAININGS: '/v1/courses',
+  TRAINING_DETAIL: (id: string | number) => `/v1/courses/${id}`,
+  TRAINING_FILTERS: '/v1/courses/filters/data',
+  REGISTRATIONS: '/v1/registrations',
+  CHECK_AVAILABILITY: (id: string | number) => `/v1/courses/${id}/availability`,
+  DASHBOARD_STATS: '/v1/dashboard/stats',
+  POPULAR_TRAININGS: '/v1/dashboard/popular-trainings'
 };
 
 // Enhanced fetch with timeout and AbortController
@@ -42,7 +42,7 @@ export const apiService = {
       const queryString = new URLSearchParams(
         Object.entries(params).map(([key, value]) => [key, String(value)])
       ).toString();
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses?${queryString}`);
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/courses?${queryString}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -55,7 +55,7 @@ export const apiService = {
 
   getTrainingDetail: async (id: number) => {
     try {
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses/${id}`);
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/courses/${id}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -68,7 +68,7 @@ export const apiService = {
 
   getFiltersData: async () => {
     try {
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses/filters/data`);
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/courses/filters/data`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -82,7 +82,7 @@ export const apiService = {
   // Favorites
   getFavorites: async (email: string) => {
     try {
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/favorites?email=${encodeURIComponent(email)}`);
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/favorites?email=${encodeURIComponent(email)}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -95,7 +95,7 @@ export const apiService = {
 
   toggleFavorite: async (email: string, type: 'course' | 'training', id: number) => {
     try {
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/favorites/toggle`, {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/favorites/toggle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +115,7 @@ export const apiService = {
   // Inscriptions
   createRegistration: async (data: Record<string, unknown>) => {
     try {
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/registrations`, {
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/registrations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ export const apiService = {
 
   checkAvailability: async (trainingId: number) => {
     try {
-      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/courses/${trainingId}/availability`);
+      const response = await fetchWithTimeout(`${import.meta.env.VITE_API_URL}/v1/courses/${trainingId}/availability`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

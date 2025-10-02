@@ -56,6 +56,9 @@ class InPersonTraining extends Model
         'available_seats',
         'is_full',
         'discount_percentage',
+        'image_url',
+        'formatted_date',
+        'can_register',
     ];
 
     // Relations optionnelles
@@ -102,8 +105,15 @@ class InPersonTraining extends Model
         if (!$this->original_price || $this->original_price <= $this->price) {
             return null;
         }
-        
+
         return (int) round((($this->original_price - $this->price) / $this->original_price) * 100);
+    }
+
+    public function getImageUrlAttribute(): string
+    {
+        return $this->image
+            ? asset('storage/' . $this->image)
+            : 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=300&fit=crop';
     }
 
     // Scopes
@@ -122,6 +132,11 @@ class InPersonTraining extends Model
         return $query->where('start_date', '>=', now())->where('status', 'scheduled');
     }
 
+    public function scopeScheduled($query)
+    {
+        return $query->where('status', 'scheduled');
+    }
+
     public function scopeSearch($query, $term)
     {
         return $query->where(function ($q) use ($term) {
@@ -131,6 +146,41 @@ class InPersonTraining extends Model
               ->orWhere('city_name', 'LIKE', "%{$term}%")  // ✅ Recherche par ville
               ->orWhere('trainer_name', 'LIKE', "%{$term}%"); // ✅ Recherche par formateur
         });
+    }
+
+    public function scopeByCategory($query, $categoryId)
+    {
+        return $query->where('category_id', $categoryId);
+    }
+
+    public function scopeByCity($query, $cityId)
+    {
+        return $query->where('city_id', $cityId);
+    }
+
+    public function scopeHighestRated($query)
+    {
+        return $query->orderBy('rating', 'desc');
+    }
+
+    public function scopePriceAsc($query)
+    {
+        return $query->orderBy('price', 'asc');
+    }
+
+    public function scopePriceDesc($query)
+    {
+        return $query->orderBy('price', 'desc');
+    }
+
+    public function scopePopular($query)
+    {
+        return $query->orderBy('registered_seats', 'desc');
+    }
+
+    public function scopeByStartDate($query, $direction = 'asc')
+    {
+        return $query->orderBy('start_date', $direction);
     }
 
     protected static function boot()

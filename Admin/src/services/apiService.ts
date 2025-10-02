@@ -1,6 +1,6 @@
 export class ApiService {
   private baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-  private baseURLV1 = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+  private baseURLV1 = import.meta.env.VITE_API_URL_V1 || import.meta.env.VITE_API_URL?.replace('/api', '/api/v1') || 'http://localhost:8000/api/v1';
 
   private getAuthToken(): string | null {
     const tokenKey = import.meta.env.VITE_ADMIN_TOKEN_KEY || 'auth_token';
@@ -13,8 +13,10 @@ export class ApiService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const baseWithoutApi = this.baseURL.replace('/api', '');
-        const response = await fetch(`${baseWithoutApi}/sanctum/csrf-cookie`, {
+        // CSRF cookie is at /sanctum/csrf-cookie (not under /api/)
+        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+        const sanctumBase = baseURL.replace('/api', '');
+        const response = await fetch(`${sanctumBase}/sanctum/csrf-cookie`, {
           credentials: 'include',
         });
 
@@ -55,7 +57,7 @@ export class ApiService {
       'Accept': 'application/json',
       'Authorization': `Bearer ${token}`,
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     // Use v1 URL for admin endpoints, base URL for auth endpoints
@@ -75,7 +77,7 @@ export class ApiService {
         try {
           const data = JSON.parse(text);
           errorMessage = data.message || errorMessage;
-        } catch (e) {
+        } catch {
           errorMessage = text;
         }
       }
@@ -111,7 +113,7 @@ export class ApiService {
     const headers: Record<string, string> = {
       'Accept': 'application/json',
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -128,7 +130,7 @@ export class ApiService {
         try {
           const data = JSON.parse(text);
           errorMessage = data.message || errorMessage;
-        } catch (e) {
+        } catch {
           errorMessage = text;
         }
       }
@@ -186,6 +188,17 @@ export class ApiService {
 
     return this.request(endpoint, {
       method: 'DELETE'
+    });
+  }
+
+  async updateFormationStatus(mode: 'online' | 'in-person', id: number, status: string) {
+    const endpoint = mode === 'online'
+      ? `/admin/courses/${id}/toggle-published`
+      : `/admin/in-person-trainings/${id}/update-status`;
+
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
     });
   }
 
@@ -305,20 +318,20 @@ export class ApiService {
   }
 
   async logout() {
-    return this.request('/logout', {
+    return this.request('/v1/logout', {
       method: 'POST'
     });
   }
 
   async verifyOTP(userId: number, otp: string) {
-    return this.request('/verify-otp', {
+    return this.request('/v1/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ user_id: userId, otp })
     });
   }
 
   async getCurrentUser() {
-    return this.request('/user');
+    return this.request('/v1/user');
   }
 
   // ========== DASHBOARD ==========
@@ -333,6 +346,11 @@ export class ApiService {
     Object.keys(formData).forEach(key => {
       const value = formData[key];
       if (value !== null && value !== undefined) {
+        // Skip empty strings for nullable URL fields
+        if ((key === 'access_link' || key === 'video_url') && value === '') {
+          return;
+        }
+
         if (key === 'skills' && Array.isArray(value)) {
           // Envoyer skills comme array JSON
           data.append(key, JSON.stringify(value));

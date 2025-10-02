@@ -1,9 +1,8 @@
 // components/FormationManagement.tsx - Version corrigée avec saisie manuelle
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, Filter, Plus, Edit, Trash2, Eye, Wifi, Building, Users, Calendar, 
-  Clock, MapPin, Star, TrendingUp, Save, X, Loader2, AlertCircle, Check, 
-  ChevronDown, FileText, BarChart3, Link, Video, Globe, CheckCircle
+import {
+  Search, Plus, Edit, Trash2, Wifi, Building, Calendar,
+  MapPin, Save, X, Loader2, AlertCircle, CheckCircle, Link, Video
 } from 'lucide-react';
 import { useAuth } from '../context/AuthProvider';
 import { apiService } from '../services/apiService';
@@ -60,11 +59,11 @@ interface FormDataInterface {
   short_description: string;
   description: string;
   category_id: number;
-  trainer_name: string; // Changé de trainer_id à trainer_name
+  trainer_name: string;
   price: number;
   original_price?: number;
   is_active: boolean;
-  
+
   // Formations en ligne
   level?: string;
   type?: string;
@@ -76,9 +75,9 @@ interface FormDataInterface {
   is_new?: boolean;
   access_link?: string;
   video_url?: string;
-  
+
   // Formations en présentiel
-  city_name?: string; // Changé de city_id à city_name
+  city_name?: string;
   duration_days?: number;
   start_date?: string;
   end_date?: string;
@@ -115,7 +114,7 @@ const FormationModal = ({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<{id: number; name: string;}[]>([]);
   const [skillInput, setSkillInput] = useState('');
 
   useEffect(() => {
@@ -857,29 +856,12 @@ const FormationManagement = () => {
     per_page: 10
   });
 
-  // Vérification de l'authentification
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Accès non autorisé</h2>
-          <p className="text-gray-600">Veuillez vous connecter pour accéder à cette page.</p>
-        </div>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    loadFormations();
-  }, [activeMode, searchTerm, selectedCategory, selectedStatus, currentPage]);
-
-  const loadFormations = async () => {
+  const loadFormations = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     
     try {
-      const params: any = {
+      const params: Record<string, string | number> = {
         page: currentPage,
         per_page: 10
       };
@@ -899,13 +881,36 @@ const FormationManagement = () => {
           per_page: response.data.per_page || 10
         });
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erreur chargement formations:', err);
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Erreur lors du chargement');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadFormations();
+  }, [activeMode, searchTerm, selectedCategory, selectedStatus, currentPage]);
+
+  // Vérification de l'authentification
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Accès non autorisé</h2>
+          <p className="text-gray-600">Veuillez vous connecter pour accéder à cette page.</p>
+        </div>
+      </div>
+    );
+  }
+
+
 
   const handleSave = async (formData: FormDataInterface, imageFile?: File) => {
     try {
@@ -928,10 +933,11 @@ const FormationManagement = () => {
       setEditingFormation(null);
       
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err.message || 'Erreur lors de la sauvegarde';
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage = errorObj?.response?.data?.message || (err as Error)?.message || 'Erreur lors de la sauvegarde';
       setError(errorMessage);
-      console.error('Erreur détaillée:', err?.response?.data);
+      console.error('Erreur détaillée:', errorObj?.response?.data);
       setTimeout(() => setError(null), 5000);
       throw err;
     }

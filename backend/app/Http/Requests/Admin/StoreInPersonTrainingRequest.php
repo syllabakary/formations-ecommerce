@@ -99,7 +99,7 @@ class StoreInPersonTrainingRequest extends FormRequest
         // Convert boolean strings to actual booleans
         $this->merge([
             'is_popular' => filter_var($this->is_popular, FILTER_VALIDATE_BOOLEAN),
-            'is_active' => filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN),
+            'is_active' => $this->has('is_active') ? filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN) : true, // Default to true if not provided
         ]);
     }
 }
