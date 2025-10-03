@@ -1,21 +1,86 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowRight, BookOpen, Users, Award, Calendar, 
   Star, Clock, Briefcase, GraduationCap, Globe, 
-  Play, ChevronRight, Check, Zap, Target 
+  Play, Check, Search, Code, Database, Palette, 
+  Shield, TrendingUp, Languages, Calculator, BarChart,
+  MapPin, X, ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 
-// Composant compteur animé
+// Configuration API
+const API_CONFIG = {
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+};
+
+// Grandes villes de Côte d'Ivoire
+const CITIES_CI = [
+  'Abidjan', 'Bouaké', 'Daloa', 'San-Pédro', 'Yamoussoukro',
+  'Korhogo', 'Man', 'Divo', 'Gagnoa', 'Abengourou'
+];
+
+// Service API
+class ApiService {
+  private baseURL = API_CONFIG.baseURL;
+
+  async getCategories() {
+    try {
+      const response = await fetch(`${this.baseURL}/v1/courses/filters/data`);
+      if (!response.ok) return { data: { categories: [], cities: [] } };
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.warn('Erreur chargement catégories:', error);
+      return { data: { categories: [], cities: [] } };
+    }
+  }
+
+  async searchTrainings(query: string) {
+    try {
+      // Rechercher dans les formations en ligne ET en présentiel
+      const [onlineResponse, inPersonResponse] = await Promise.all([
+        fetch(`${this.baseURL}/v1/courses?mode=online&search=${encodeURIComponent(query)}&per_page=3`),
+        fetch(`${this.baseURL}/v1/courses?mode=in-person&search=${encodeURIComponent(query)}&per_page=3`)
+      ]);
+      
+      const onlineData = onlineResponse.ok ? await onlineResponse.json() : { data: [] };
+      const inPersonData = inPersonResponse.ok ? await inPersonResponse.json() : { data: [] };
+      
+      // Combiner les résultats et limiter à 6 au total
+      const combined = [
+        ...(onlineData.data || []).map(item => ({ ...item, mode: 'online' })),
+        ...(inPersonData.data || []).map(item => ({ ...item, mode: 'in-person' }))
+      ].slice(0, 6);
+      
+      return { data: combined };
+    } catch (error) {
+      console.warn('Erreur recherche:', error);
+      return { data: [] };
+    }
+  }
+
+  async getPopularCourses() {
+    try {
+      const response = await fetch(`${this.baseURL}/v1/courses?mode=online&sort_by=popular&per_page=3`);
+      if (!response.ok) return { data: [] };
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.warn('Erreur chargement formations populaires:', error);
+      return { data: [] };
+    }
+  }
+}
+
 const AnimatedCounter = ({ end, duration = 2, label, icon }) => {
   const [count, setCount] = useState(0);
   const controls = useAnimation();
 
   useEffect(() => {
     let start = 0;
-    const increment = end / (duration * 60); // 60 fps
+    const increment = end / (duration * 60);
     
     const updateCounter = () => {
       start += increment;
@@ -49,8 +114,7 @@ const AnimatedCounter = ({ end, duration = 2, label, icon }) => {
   );
 };
 
-// Composant carte de formation
-const CourseCard = ({ title, rating, duration, startDate, price, image, onClick }) => {
+const CourseCard = ({ title, rating, duration, startDate, price, image, onClick, isTrending, isNew }) => {
   return (
     <motion.div 
       whileHover={{ y: -10 }}
@@ -58,9 +122,28 @@ const CourseCard = ({ title, rating, duration, startDate, price, image, onClick 
       onClick={onClick}
     >
       <div className="relative h-48 overflow-hidden">
+        {(isTrending || isNew) && (
+          <div className="absolute top-3 left-3 z-10 flex gap-2">
+            {isTrending && (
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Tendance
+              </div>
+            )}
+            {isNew && (
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                Nouveau
+              </div>
+            )}
+          </div>
+        )}
         <img 
           src={image} 
-          alt={title} 
+          alt={title}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = 'https://via.placeholder.com/400x300?text=Formation';
+          }}
           className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
@@ -94,7 +177,6 @@ const CourseCard = ({ title, rating, duration, startDate, price, image, onClick 
   );
 };
 
-// Composant témoignage
 const TestimonialCard = ({ quote, author, role, avatar }) => {
   return (
     <motion.div
@@ -123,8 +205,28 @@ const TestimonialCard = ({ quote, author, role, avatar }) => {
 const Home = () => {
   const navigate = useNavigate();
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [categories, setCategories] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [popularCourses, setPopularCourses] = useState([]);
+  
+  // États pour le moteur de recherche intelligent
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  const searchRef = useRef(null);
+  const categoryRef = useRef(null);
+  const cityRef = useRef(null);
+  
   const controls = useAnimation();
   const [ref, inView] = useInView({ threshold: 0.1 });
+
+  const apiService = new ApiService();
 
   useEffect(() => {
     if (inView) {
@@ -132,7 +234,117 @@ const Home = () => {
     }
   }, [controls, inView]);
 
-  // Données des témoignages
+  useEffect(() => {
+    loadCategories();
+    loadPopularCourses();
+  }, []);
+
+  // Fermer les dropdowns au clic extérieur
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+      if (categoryRef.current && !categoryRef.current.contains(event.target)) {
+        setShowCategoryDropdown(false);
+      }
+      if (cityRef.current && !cityRef.current.contains(event.target)) {
+        setShowCityDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Recherche intelligente avec suggestions et filtrage côté client
+  useEffect(() => {
+    const searchWithDelay = setTimeout(async () => {
+      if (searchQuery.trim().length >= 2) {
+        setIsSearching(true);
+        try {
+          const response = await apiService.searchTrainings(searchQuery);
+          
+          // Filtrer et trier les résultats par pertinence
+          const results = (response.data || []).filter(item => {
+            const searchLower = searchQuery.toLowerCase();
+            const titleMatch = item.title?.toLowerCase().includes(searchLower);
+            const descMatch = item.short_description?.toLowerCase().includes(searchLower);
+            const categoryMatch = item.category?.name?.toLowerCase().includes(searchLower);
+            const skillsMatch = item.skills?.some(skill => skill.toLowerCase().includes(searchLower));
+            
+            return titleMatch || descMatch || categoryMatch || skillsMatch;
+          }).sort((a, b) => {
+            // Prioriser les correspondances dans le titre
+            const aTitle = a.title?.toLowerCase().includes(searchQuery.toLowerCase());
+            const bTitle = b.title?.toLowerCase().includes(searchQuery.toLowerCase());
+            if (aTitle && !bTitle) return -1;
+            if (!aTitle && bTitle) return 1;
+            return 0;
+          });
+          
+          setSearchSuggestions(results);
+          setShowSuggestions(results.length > 0);
+        } catch (error) {
+          console.error('Erreur recherche:', error);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchWithDelay);
+  }, [searchQuery]);
+
+  const loadCategories = async () => {
+    const response = await apiService.getCategories();
+    setCategories(response.data?.categories || []);
+    setCities(response.data?.cities || []);
+  };
+
+  const loadPopularCourses = async () => {
+    const response = await apiService.getPopularCourses();
+    setPopularCourses(response.data || []);
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.append('search', searchQuery.trim());
+    if (selectedCategory) params.append('category', selectedCategory);
+    if (selectedCity) params.append('city', selectedCity);
+    
+    navigate(`/catalog?${params.toString()}`);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    // Redirection selon le mode de formation
+    if (suggestion.mode === 'online') {
+      navigate(`/course/${suggestion.slug}`);
+    } else {
+      navigate(`/training/${suggestion.slug}`);
+    }
+    setShowSuggestions(false);
+    setSearchQuery('');
+  };
+
+  const categoryIcons = {
+    "Développement": Code,
+    "IA & Data": Database,
+    "Design": Palette,
+    "Sécurité": Shield,
+    "Marketing": TrendingUp,
+    "Ressources Humaines": Users,
+    "Management & Leadership": Briefcase,
+    "Commerce & Vente": BarChart,
+    "Langues & Communication": Languages,
+    "Finance & Audit": Calculator,
+  };
+
   const testimonials = [
     {
       quote: "Grâce à EMPOWER FORMATION, j'ai pu me reconvertir professionnellement en seulement 6 mois. La qualité des cours et le soutien de la communauté ont été déterminants dans ma réussite.",
@@ -148,35 +360,6 @@ const Home = () => {
     }
   ];
 
-  // Données des formations
-  const courses = [
-    {
-      title: "Développement Web Full Stack",
-      rating: 4.9,
-      duration: "12 semaines",
-      startDate: "15 mai",
-      price: "350",
-      image: "https://images.unsplash.com/photo-1587620962725-abab7fe55159?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8d2ViJTIwZGV2ZWxvcG1lbnR8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=800&q=60"
-    },
-    {
-      title: "Data Science & Intelligence Artificielle",
-      rating: 4.8,
-      duration: "16 semaines",
-      startDate: "1er juin",
-      price: "450",
-      image: "https://images.unsplash.com/photo-1571171637578-41bc2dd41cd2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8ZGF0YSUyMHNjaWVuY2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=800&q=60"
-    },
-    {
-      title: "Marketing Digital & Growth Hacking",
-      rating: 4.7,
-      duration: "8 semaines",
-      startDate: "10 mai",
-      price: "280",
-      image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8ZGlnaXRhbCUyMG1hcmtldGluZ3xlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60"
-    }
-  ];
-
-  // Animation pour les sections
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -201,15 +384,13 @@ const Home = () => {
 
   return (
     <div className="space-y-20">
-      {/* Hero Section */}
+      {/* Hero Section avec Moteur de Recherche Intelligent */}
       <section className="relative min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100 overflow-hidden">
-        {/* Background elements */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-200 rounded-full opacity-30 transform translate-x-32 -translate-y-32"></div>
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-300 rounded-full opacity-40 transform translate-x-16 translate-y-16"></div>
         
         <div className="max-w-7xl mx-auto px-4 py-20 flex flex-col min-h-screen">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center flex-1">
-            {/* Left Content */}
             <motion.div 
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -217,32 +398,240 @@ const Home = () => {
               className="space-y-8 z-10 relative"
             >
               <div className="space-y-6">
-                <h1 className="text-5xl lg:text-6xl font-bold text-purple-900 leading-tight">
-                  Façonnez votre <span className="text-purple-600">avenir</span>
+                <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+                  Trouvez la solution de <span className="text-purple-600">formation adaptée</span> à vos besoins
                 </h1>
                 <div className="w-32 h-1 bg-purple-600"></div>
-                <h2 className="text-2xl lg:text-3xl font-semibold text-purple-700">
-                  avec Empower Formation
-                </h2>
               </div>
               
-              <div className="space-y-4 text-lg text-gray-700">
-                <p className="font-medium">Des formations innovantes pour la jeunesse africaine.</p>
-                <p>Développez vos compétences, réalisez vos ambitions.</p>
-              </div>
-              
-              <div className="flex flex-wrap gap-4 pt-4">
-                <button
-                  onClick={() => navigate('/catalog')}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2"
-                >
-                  <span>Commencer maintenant</span>
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-                <button className="flex items-center gap-2 text-purple-600 hover:text-purple-800 font-medium">
-                  <Play className="h-5 w-5" />
-                  <span>Voir la vidéo</span>
-                </button>
+              {/* Moteur de Recherche Intelligent */}
+              <div className="bg-white rounded-3xl shadow-2xl p-8 space-y-6 border-2 border-gray-100">
+                <h3 className="text-xl font-bold text-gray-900">Votre recherche</h3>
+                
+                <form onSubmit={handleSearch} className="space-y-4">
+                  {/* Champ de recherche avec suggestions */}
+                  <div ref={searchRef} className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Que souhaitez-vous apprendre ?
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
+                        placeholder="Ex: Développement web, Marketing digital, Data science..."
+                        className="w-full pl-12 pr-10 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setSearchSuggestions([]);
+                          }}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
+                        >
+                          <X className="h-5 w-5 text-gray-400" />
+                        </button>
+                      )}
+                      {isSearching && (
+                        <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin h-5 w-5 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Suggestions de recherche */}
+                    <AnimatePresence>
+                      {showSuggestions && searchSuggestions.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto"
+                        >
+                          <div className="p-2">
+                            <div className="text-xs font-medium text-gray-500 px-3 py-2">
+                              Suggestions ({searchSuggestions.length})
+                            </div>
+                            {searchSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion.id}
+                                type="button"
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="w-full text-left px-3 py-3 hover:bg-purple-50 rounded-lg transition-colors flex items-start gap-3"
+                              >
+                                <Search className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 line-clamp-1">
+                                    {suggestion.title}
+                                  </div>
+                                  <div className="text-sm text-gray-600 line-clamp-1 flex items-center gap-2">
+                                    <span>{suggestion.category?.name}</span>
+                                    <span>•</span>
+                                    <span>{suggestion.mode === 'online' ? 'En ligne' : 'En présentiel'}</span>
+                                    <span>•</span>
+                                    <span>{suggestion.duration_formatted || (suggestion.duration_days ? `${suggestion.duration_days} jours` : 'N/A')}</span>
+                                  </div>
+                                </div>
+                                <div className="text-sm font-semibold text-purple-600 flex-shrink-0">
+                                  {suggestion.formatted_price}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Sélection de catégorie */}
+                  <div ref={categoryRef} className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Domaine de formation
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                      className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl text-left focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all flex items-center justify-between hover:border-gray-300"
+                    >
+                      <span className={selectedCategory ? 'text-gray-900' : 'text-gray-500'}>
+                        {selectedCategory 
+                          ? categories.find(c => c.id.toString() === selectedCategory)?.name 
+                          : 'Toutes les catégories'}
+                      </span>
+                      <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    <AnimatePresence>
+                      {showCategoryDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto"
+                        >
+                          <div className="p-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCategory('');
+                                setShowCategoryDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-purple-50 rounded-lg transition-colors font-medium text-gray-900"
+                            >
+                              Toutes les catégories
+                            </button>
+                            {categories.map((category) => {
+                              const IconComponent = categoryIcons[category.name] || Code;
+                              return (
+                                <button
+                                  key={category.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCategory(category.id.toString());
+                                    setShowCategoryDropdown(false);
+                                  }}
+                                  className="w-full text-left px-4 py-3 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-3"
+                                >
+                                  <IconComponent className="h-5 w-5 text-gray-600" />
+                                  <span className="flex-1 text-gray-900">{category.name}</span>
+                                  <span className="text-sm text-gray-500">{category.trainings_count}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Sélection de ville */}
+                  <div ref={cityRef} className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ville (formations en présentiel)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCityDropdown(!showCityDropdown)}
+                      className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl text-left focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all flex items-center justify-between hover:border-gray-300"
+                    >
+                      <span className={selectedCity ? 'text-gray-900' : 'text-gray-500'}>
+                        {selectedCity 
+                          ? cities.find(c => c.id.toString() === selectedCity)?.name 
+                          : 'Toutes les villes'}
+                      </span>
+                      <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    <AnimatePresence>
+                      {showCityDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto"
+                        >
+                          <div className="p-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCity('');
+                                setShowCityDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-purple-50 rounded-lg transition-colors font-medium text-gray-900"
+                            >
+                              Toutes les villes
+                            </button>
+                            {cities.filter(city => CITIES_CI.includes(city.name)).map((city) => (
+                              <button
+                                key={city.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCity(city.id.toString());
+                                  setShowCityDropdown(false);
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-3"
+                              >
+                                <MapPin className="h-5 w-5 text-gray-600" />
+                                <span className="flex-1 text-gray-900">{city.name}</span>
+                                <span className="text-sm text-gray-500">{city.trainings_count}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                  >
+                    <Search className="h-6 w-6" />
+                    Rechercher
+                  </button>
+                </form>
+                
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                  <span className="text-sm text-gray-600">Raccourcis :</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/catalog?mode=online')}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700 transition-all"
+                  >
+                    Formations à distance
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/catalog?mode=in-person')}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700 transition-all"
+                  >
+                    Formations CPF
+                  </button>
+                </div>
               </div>
               
               <div className="flex flex-wrap gap-6 pt-4">
@@ -259,14 +648,12 @@ const Home = () => {
               </div>
             </motion.div>
            
-            {/* Right Content - Image */}
             <motion.div 
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
               className="relative z-10"
             >
-              {/* Logo en arrière-plan */}
               <div className="absolute top-[-20%] left-[5%] w-full h-full flex justify-center items-start">
                 <img
                   src="/asset/LOGO EMPOWER FORMATION/Symbol EF.jpg"
@@ -275,7 +662,6 @@ const Home = () => {
                 />
               </div>
 
-              {/* Image principale */}
               <div className="relative overflow-hidden rounded-xl shadow-2xl transform hover:scale-[1.02] transition-transform duration-500">
                 <img
                   src="/asset/femme.png"
@@ -295,6 +681,70 @@ const Home = () => {
             </motion.div>
           </div>
         </div>
+      </section>
+
+      {/* Section Catégories */}
+      <section className="max-w-7xl mx-auto px-4 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl font-bold mb-4">Domaines de formation</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Explorez nos différents domaines de formation et trouvez celui qui correspond à vos ambitions professionnelles
+          </p>
+        </motion.div>
+
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"
+        >
+          {categories.map((category) => {
+            const IconComponent = categoryIcons[category.name] || Code;
+            
+            return (
+              <motion.div
+                key={`category-${category.id}-${category.name}`}
+                variants={itemVariants}
+                whileHover={{ scale: 1.05, y: -5 }}
+                onClick={() => navigate(`/catalog?category=${category.id}`)}
+                className="cursor-pointer"
+              >
+                <div className="bg-white hover:bg-gray-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 border-2 border-gray-100 hover:border-purple-300">
+                  <div className="flex flex-col items-center text-center space-y-3">
+                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 p-4 rounded-xl">
+                      <IconComponent className="h-8 w-8 text-gray-700" />
+                    </div>
+                    <h3 className="font-bold text-sm leading-tight text-gray-900">{category.name}</h3>
+                    <p className="text-xs text-gray-600">{category.trainings_count} formations</p>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          viewport={{ once: true }}
+          className="text-center mt-8"
+        >
+          <button 
+            onClick={() => navigate('/catalog')}
+            className="text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-2 mx-auto hover:gap-3 transition-all"
+          >
+            Voir toutes les catégories
+            <ArrowRight className="h-5 w-5" />
+          </button>
+        </motion.div>
       </section>
 
       {/* Statistiques Animées */}
@@ -423,17 +873,57 @@ const Home = () => {
           viewport={{ once: true }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
         >
-          {courses.map((course, index) => (
-            <motion.div 
-              key={index}
-              variants={itemVariants}
-            >
-              <CourseCard 
-                {...course}
-                onClick={() => navigate('/course-details')}
-              />
-            </motion.div>
-          ))}
+          {popularCourses.length > 0 ? (
+            popularCourses.map((course) => (
+              <motion.div key={course.id} variants={itemVariants}>
+                <CourseCard 
+                  title={course.title}
+                  rating={course.rating}
+                  duration={course.duration_formatted}
+                  startDate="Inscription ouverte"
+                  price={course.formatted_price}
+                  image={course.image_url || 'https://via.placeholder.com/400x300?text=Formation'}
+                  onClick={() => navigate(`/course/${course.slug}`)}
+                  isTrending={course.is_trending}
+                  isNew={course.is_new}
+                />
+              </motion.div>
+            ))
+          ) : (
+            [
+              {
+                title: "Développement Web Full Stack",
+                rating: 4.9,
+                duration: "12 semaines",
+                startDate: "15 mai",
+                price: "350 000",
+                image: "https://images.unsplash.com/photo-1587620962725-abab7fe55159?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60"
+              },
+              {
+                title: "Data Science & Intelligence Artificielle",
+                rating: 4.8,
+                duration: "16 semaines",
+                startDate: "1er juin",
+                price: "450 000",
+                image: "https://images.unsplash.com/photo-1571171637578-41bc2dd41cd2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60"
+              },
+              {
+                title: "Marketing Digital & Growth Hacking",
+                rating: 4.7,
+                duration: "8 semaines",
+                startDate: "10 mai",
+                price: "280 000",
+                image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60"
+              }
+            ].map((course, index) => (
+              <motion.div key={index} variants={itemVariants}>
+                <CourseCard 
+                  {...course}
+                  onClick={() => navigate('/catalog')}
+                />
+              </motion.div>
+            ))
+          )}
         </motion.div>
         
         <motion.div
@@ -467,86 +957,9 @@ const Home = () => {
         </motion.div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTestimonial}
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 50 }}
-              transition={{ duration: 0.5 }}
-            >
-              <TestimonialCard {...testimonials[activeTestimonial]} />
-            </motion.div>
-          </AnimatePresence>
-          
-          <div className="space-y-8">
-            {testimonials.map((_, index) => (
-              <motion.div
-                key={index}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`p-6 rounded-lg cursor-pointer transition-colors ${activeTestimonial === index ? 'bg-purple-600 text-white' : 'bg-white shadow-md'}`}
-                onClick={() => setActiveTestimonial(index)}
-              >
-                <div className="flex items-center">
-                  <div className={`w-12 h-12 rounded-full overflow-hidden mr-4 border-2 ${activeTestimonial === index ? 'border-white' : 'border-purple-200'}`}>
-                    <img src={testimonials[index].avatar} alt={testimonials[index].author} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <h4 className={`font-semibold ${activeTestimonial === index ? 'text-white' : 'text-gray-900'}`}>
-                      {testimonials[index].author}
-                    </h4>
-                    <p className={`text-sm ${activeTestimonial === index ? 'text-white/80' : 'text-gray-500'}`}>
-                      {testimonials[index].role}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Partenaires */}
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl font-bold mb-4">Ils nous font confiance</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">Nous collaborons avec des entreprises et des institutions de premier plan.</p>
-          </motion.div>
-          
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 items-center"
-          >
-            {[
-              "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/2560px-Google_2015_logo.svg.png",
-              "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/2560px-Amazon_logo.svg.png",
-              "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/2560px-Netflix_2015_logo.svg.png",
-              "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Microsoft_logo.svg/2048px-Microsoft_logo.svg.png",
-              "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Meta-Logo.png/2560px-Meta-Logo.png"
-            ].map((logo, index) => (
-              <motion.div 
-                key={index}
-                variants={itemVariants}
-                whileHover={{ scale: 1.1 }}
-                className="flex justify-center"
-              >
-                <div className="w-32 h-16 bg-white p-4 rounded-md flex items-center justify-center">
-                  <img src={logo} alt={`Logo partenaire ${index + 1}`} className="max-h-full" />
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+          {testimonials.map((testimonial, index) => (
+            <TestimonialCard key={index} {...testimonial} />
+          ))}
         </div>
       </section>
 
@@ -612,7 +1025,7 @@ const Home = () => {
             className="rounded-xl overflow-hidden shadow-xl"
           >
             <img 
-              src="https://images.unsplash.com/photo-1531545514256-b1400bc00f31?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTV8fGFmcmljYW4lMjBzdHVkZW50c3xlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60" 
+              src="https://images.unsplash.com/photo-1531545514256-b1400bc00f31?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60" 
               alt="Étudiants africains" 
               className="w-full h-full object-cover"
             />
@@ -651,7 +1064,7 @@ const Home = () => {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/formations')}
+              onClick={() => navigate('/catalog')}
               className="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-all"
             >
               Découvrir nos formations

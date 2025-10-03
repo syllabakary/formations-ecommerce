@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Catalog from './pages/Catalog';
 import Blog from './pages/Blog';
+import CourseDetails from './pages/CourseDetails';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PaymentPage from './pages/paiement';
@@ -16,6 +17,7 @@ import Presentiel from './pages/presentiel';
 import Catalog2 from './pages/Catalog2';
 import Settings from './pages/Settings';
 import Chat from './components/Chat';
+
 
 function App() {
   return (
@@ -38,6 +40,7 @@ function App() {
                 <Route path="/catalog2" element={<Catalog2 />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/chat" element={<Chat />} />
+                <Route path="/course/:slug" element={<CourseDetails onBack={() => navigate('/catalog')} />} />
               </Routes>
             </div>
             <Footer />

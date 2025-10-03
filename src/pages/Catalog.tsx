@@ -1,35 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, 
-  Filter, 
-  X, 
-  Star, 
-  Clock, 
-  Users, 
-  Play, 
-  Award, 
-  TrendingUp, 
-  Code,
-  Shield, 
-  Database, 
-  Palette, 
-  Briefcase, 
-  BarChart, 
-  Languages, 
-  Calculator,
-  Heart, 
-  ChevronDown, 
-  ArrowRight,
-  MapPin,
-  Calendar,
-  Wifi,
-  Building,
-  Loader2,
-  AlertCircle,
-  Check,
-  BarChart3,
-  Eye
+  Search, X, Star, Clock, Users, Play, Award, TrendingUp, Code,
+  Shield, Database, Palette, Briefcase, BarChart, Languages, Calculator,
+  Heart, ArrowRight, MapPin, Calendar, Wifi, Building, Loader2,
+  AlertCircle, Check, BarChart3, Eye, ChevronRight
 } from 'lucide-react';
+import CourseDetails from './CourseDetails';
 
 // Configuration API
 const API_CONFIG = {
@@ -151,21 +127,7 @@ interface CategoryConfig {
   };
 }
 
-interface RegistrationFormData {
-  participant_name: string;
-  participant_email: string;
-  participant_phone: string;
-  company: string;
-  notes: string;
-  course_id?: number;
-  training_id?: number;
-}
-
-interface FavoriteItem {
-  id: number;
-}
-
-// Service API avec gestion d'erreurs améliorée
+// Service API
 class TrainingApiService {
   private baseURL = API_CONFIG.baseURL;
 
@@ -231,7 +193,6 @@ class TrainingApiService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          // Retourner des données vides si l'endpoint n'existe pas
           return { data: { categories: [], cities: [] } };
         }
         throw new Error(`Erreur serveur: ${response.status}`);
@@ -240,7 +201,6 @@ class TrainingApiService {
       return await response.json();
     } catch (error: unknown) {
       console.warn('Erreur getFilterData:', error);
-      // Retourner des données vides en cas d'erreur
       return { data: { categories: [], cities: [] } };
     }
   }
@@ -272,7 +232,6 @@ class TrainingApiService {
 
       if (!response.ok) {
         if (response.status === 404 || response.status === 500) {
-          // Retourner un tableau vide si l'endpoint n'existe pas ou erreur serveur
           return { data: [] };
         }
         throw new Error('Erreur lors du chargement des favoris');
@@ -281,34 +240,12 @@ class TrainingApiService {
       return await response.json();
     } catch (error: unknown) {
       console.warn('Erreur getFavorites:', error);
-      // Retourner un tableau vide en cas d'erreur
       return { data: [] };
-    }
-  }
-
-  async registerForTraining(formData: RegistrationFormData) {
-    try {
-      const response = await this.fetchWithTimeout(`${this.baseURL}/v1/registrations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Erreur d\'inscription' }));
-        throw new Error(error.message || 'Erreur lors de l\'inscription');
-      }
-
-      return await response.json();
-    } catch (error: unknown) {
-      console.error('Erreur registerForTraining:', error);
-      throw error;
     }
   }
 }
 
 const UnifiedTrainingCatalog = () => {
-  // États principaux
   const [activeMode, setActiveMode] = useState<'online' | 'in-person'>('online');
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [filterData, setFilterData] = useState<FilterData>({ categories: [], cities: [] });
@@ -316,7 +253,6 @@ const UnifiedTrainingCatalog = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Filtres
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -325,22 +261,16 @@ const UnifiedTrainingCatalog = () => {
   const [sortBy, setSortBy] = useState('popular');
   const [sortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // UI États
-  const [showFilters, setShowFilters] = useState(false);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
 
-  // Fonctionnalités utilisateur
   const [favorites, setFavorites] = useState<number[]>([]);
   const [comparison, setComparison] = useState<Training[]>([]);
 
   const apiService = new TrainingApiService();
   const userEmail = 'user@example.com';
 
-  // Configuration des catégories
   const categoryConfig: CategoryConfig = {
     "Développement": { 
       icon: Code, 
@@ -404,7 +334,6 @@ const UnifiedTrainingCatalog = () => {
     },
   };
 
-  // Chargement initial - une seule fois
   useEffect(() => {
     const initializeData = async () => {
       await loadFilterData();
@@ -413,7 +342,6 @@ const UnifiedTrainingCatalog = () => {
     initializeData();
   }, []);
 
-  // Chargement des formations quand les filtres changent
   useEffect(() => {
     loadTrainings();
   }, [activeMode, searchTerm, selectedCategory, selectedCity, selectedLevel, selectedType, sortBy, sortOrder, currentPage]);
@@ -424,7 +352,6 @@ const UnifiedTrainingCatalog = () => {
       setFilterData(response.data || { categories: [], cities: [] });
     } catch (err: unknown) {
       console.warn('Impossible de charger les filtres:', err instanceof Error ? err.message : 'Erreur inconnue');
-      // Continuer sans filtres
     }
   };
 
@@ -467,10 +394,9 @@ const UnifiedTrainingCatalog = () => {
   const loadFavorites = async () => {
     try {
       const response = await apiService.getFavorites(userEmail);
-      const favoriteIds = (response.data || []).map((fav: FavoriteItem) => fav.id);
+      const favoriteIds = (response.data || []).map((fav: any) => fav.id);
       setFavorites(favoriteIds);
     } catch {
-      // Silencieux - les favoris ne sont pas critiques
       console.warn('Impossible de charger les favoris');
     }
   };
@@ -519,33 +445,6 @@ const UnifiedTrainingCatalog = () => {
         return prev;
       }
     });
-  };
-
-  const handleRegistration = async (training: Training) => {
-    try {
-      const formData: RegistrationFormData = {
-        participant_name: 'John Doe',
-        participant_email: userEmail,
-        participant_phone: '+225 07 12 34 56 78',
-        company: 'Ma Société',
-        notes: 'Inscription depuis le catalogue',
-      };
-
-      if (activeMode === 'online') {
-        formData.course_id = training.id;
-      } else {
-        formData.training_id = training.id;
-      }
-
-      await apiService.registerForTraining(formData);
-      setSuccess('Inscription réussie ! Vous recevrez un email de confirmation.');
-      setTimeout(() => setSuccess(''), 5000);
-
-      loadTrainings();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'inscription');
-      setTimeout(() => setError(''), 5000);
-    }
   };
 
   const clearAllFilters = () => {
@@ -688,10 +587,9 @@ const UnifiedTrainingCatalog = () => {
           </div>
 
           <button 
-            onClick={() => handleRegistration(course)}
             className={`w-full py-3 rounded-xl font-semibold transition-all bg-gradient-to-r ${config.gradient} text-white shadow hover:shadow-lg transform hover:scale-105 flex items-center justify-center gap-2`}
           >
-            S'inscrire maintenant
+            Voir les détails
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -823,7 +721,6 @@ const UnifiedTrainingCatalog = () => {
           </div>
 
           <button 
-            onClick={() => handleRegistration(training)}
             disabled={training.is_full || !training.can_register}
             className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
               training.is_full || !training.can_register
@@ -831,7 +728,7 @@ const UnifiedTrainingCatalog = () => {
                 : `bg-gradient-to-r ${config.gradient} text-white shadow hover:shadow-lg transform hover:scale-105`
             }`}
           >
-            {training.is_full ? 'Formation complète' : !training.can_register ? 'Inscriptions fermées' : 'S\'inscrire maintenant'}
+            {training.is_full ? 'Formation complète' : !training.can_register ? 'Inscriptions fermées' : 'Voir les détails'}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -962,12 +859,12 @@ const UnifiedTrainingCatalog = () => {
         </div>
 
         <div className="mb-8 sticky top-0 bg-white/80 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg p-4 md:p-6 z-30">
-          <div className="block lg:hidden">
-            <div className="relative mb-4">
+          <div className="flex flex-col lg:flex-row gap-4 items-center">
+            <div className="relative flex-1 max-w-md">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher une formation..."
+                placeholder="Rechercher par titre, compétence..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white/70"
@@ -982,369 +879,230 @@ const UnifiedTrainingCatalog = () => {
               )}
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-xl hover:shadow-lg transition-all"
-              >
-                <Filter className="h-4 w-4" />
-                Filtres
-                <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
-              </button>
+            <div className="flex flex-wrap gap-2">
+              {activeMode === 'in-person' && (
+                <select 
+                  value={selectedCity} 
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Toutes les villes</option>
+                  {filterData.cities.map(city => (
+                    <option key={city.id} value={city.id}>
+                      {city.name} ({city.trainings_count})
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {activeMode === 'online' && (
+                <>
+                  <select 
+                    value={selectedLevel} 
+                    onChange={(e) => setSelectedLevel(e.target.value)}
+                    className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">Tous niveaux</option>
+                    <option value="debutant">Débutant</option>
+                    <option value="intermediaire">Intermédiaire</option>
+                    <option value="avance">Avancé</option>
+                  </select>
+
+                  <select 
+                    value={selectedType} 
+                    onChange={(e) => setSelectedType(e.target.value)}
+                    className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">Tous types</option>
+                    <option value="formation">Formation</option>
+                    <option value="certification">Certification</option>
+                    <option value="specialisation">Spécialisation</option>
+                  </select>
+                </>
+              )}
+
               <select 
                 value={sortBy} 
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-3 border border-gray-200 rounded-xl bg-white/70 focus:ring-2 focus:ring-purple-500 flex-shrink-0"
+                className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
               >
-                <option value="popular">Populaires</option>
+                <option value="popular">Plus populaires</option>
                 <option value="rating">Mieux notées</option>
                 <option value="price-low">Prix croissant</option>
                 <option value="price-high">Prix décroissant</option>
-                <option value="newest">Récentes</option>
+                <option value="newest">Plus récentes</option>
               </select>
             </div>
 
-            {showMobileFilters && (
-              <div className="mt-4 p-4 bg-white/90 rounded-xl border border-gray-200 space-y-4">
-                <select 
-                  value={selectedCategory} 
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Toutes les catégories</option>
-                  {filterData.categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name} ({cat.trainings_count})
-                    </option>
-                  ))}
-                </select>
-
-                {activeMode === 'in-person' && (
-                  <select 
-                    value={selectedCity} 
-                    onChange={(e) => setSelectedCity(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Toutes les villes</option>
-                    {filterData.cities.map(city => (
-                      <option key={city.id} value={city.id}>
-                        {city.name} ({city.trainings_count})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {activeMode === 'online' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <select 
-                      value={selectedLevel} 
-                      onChange={(e) => setSelectedLevel(e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Tous niveaux</option>
-                      <option value="debutant">Débutant</option>
-                      <option value="intermediaire">Intermédiaire</option>
-                      <option value="avance">Avancé</option>
-                    </select>
-
-                    <select 
-                      value={selectedType} 
-                      onChange={(e) => setSelectedType(e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Tous types</option>
-                      <option value="formation">Formation</option>
-                      <option value="certification">Certification</option>
-                      <option value="specialisation">Spécialisation</option>
-                    </select>
-                  </div>
-                )}
-
-                <button
-                  onClick={clearAllFilters}
-                  className="w-full px-4 py-2 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-all"
-                >
-                  Effacer les filtres
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="hidden lg:block">
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher par titre, compétence..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white/70"
-                />
-                {searchTerm && (
-                  <button 
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
-                  >
-                    <X className="h-4 w-4 text-gray-400" />
-                  </button>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <select 
-                  value={selectedCategory} 
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Toutes les catégories</option>
-                  {filterData.categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name} ({cat.trainings_count})
-                    </option>
-                  ))}
-                </select>
-
-                {activeMode === 'in-person' && (
-                  <select 
-                    value={selectedCity} 
-                    onChange={(e) => setSelectedCity(e.target.value)}
-                    className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Toutes les villes</option>
-                    {filterData.cities.map(city => (
-                      <option key={city.id} value={city.id}>
-                        {city.name} ({city.trainings_count})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {activeMode === 'online' && (
-                  <>
-                    <select 
-                      value={selectedLevel} 
-                      onChange={(e) => setSelectedLevel(e.target.value)}
-                      className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Tous niveaux</option>
-                      <option value="debutant">Débutant</option>
-                      <option value="intermediaire">Intermédiaire</option>
-                      <option value="avance">Avancé</option>
-                    </select>
-
-                    <select 
-                      value={selectedType} 
-                      onChange={(e) => setSelectedType(e.target.value)}
-                      className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Tous types</option>
-                      <option value="formation">Formation</option>
-                      <option value="certification">Certification</option>
-                      <option value="specialisation">Spécialisation</option>
-                    </select>
-                  </>
-                )}
-
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg bg-white/70 hover:bg-white transition-all focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="popular">Plus populaires</option>
-                  <option value="rating">Mieux notées</option>
-                  <option value="price-low">Prix croissant</option>
-                  <option value="price-high">Prix décroissant</option>
-                  <option value="newest">Plus récentes</option>
-                </select>
-              </div>
-
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all transform hover:scale-105"
-              >
-                <Filter className="h-4 w-4" />
-                Filtres avancés
-              </button>
-            </div>
-
-            {showFilters && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-600">
-                    {totalResults} formation{totalResults > 1 ? 's' : ''} trouvée{totalResults > 1 ? 's' : ''}
-                  </div>
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-4 py-2 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-all"
-                  >
-                    Effacer tous les filtres
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-3">
-              {activeMode === 'online' ? (
-                <>
-                  <Wifi className="h-6 w-6 text-blue-600" />
-                  Formations en ligne
-                </>
-              ) : (
-                <>
-                  <Building className="h-6 w-6 text-purple-600" />
-                  Formations en présentiel
-                </>
-              )}
-            </h2>
-            <p className="text-gray-600 mt-1">
-              {totalResults} formation{totalResults > 1 ? 's' : ''} disponible{totalResults > 1 ? 's' : ''}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all hover:border-purple-500"
-            >
-              {viewMode === 'grid' ? '☰' : '⊞'}
-            </button>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="text-center">
-              <Loader2 className="h-12 w-12 text-purple-600 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Chargement des formations...</p>
-            </div>
-          </div>
-        ) : trainings.length > 0 ? (
-          <>
-            <div className={`grid gap-6 md:gap-8 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-              {trainings.map((training) => (
-                activeMode === 'online' ? (
-                  <OnlineTrainingCard key={training.id} course={training as ApiFormation} />
-                ) : (
-                  <InPersonTrainingCard key={training.id} training={training as ApiInPersonTraining} />
-                )
-              ))}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-12">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1 || loading}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Précédent
-                </button>
-                
-                <div className="flex gap-1">
-                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                    const pageNum = Math.max(1, currentPage - 2) + i;
-                    if (pageNum > totalPages) return null;
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        disabled={loading}
-                        className={`px-4 py-2 rounded-lg font-medium ${
-                          currentPage === pageNum
-                            ? 'bg-purple-600 text-white'
-                            : 'border border-gray-300 hover:bg-gray-50'
-                        } disabled:opacity-50`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || loading}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Suivant
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-16">
-            <div className="bg-white rounded-3xl shadow-xl p-12 max-w-md mx-auto border border-gray-100">
-              <div className="text-6xl mb-6">
-                {activeMode === 'online' ? '💻' : '🏢'}
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Aucune formation trouvée</h3>
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                {searchTerm || selectedCategory || selectedCity
-                  ? 'Essayez de modifier vos critères de recherche.'
-                  : `Aucune formation ${activeMode === 'online' ? 'en ligne' : 'en présentiel'} disponible pour le moment.`
-                }
-              </p>
+            {(searchTerm || selectedCategory || selectedCity || selectedLevel || selectedType) && (
               <button
                 onClick={clearAllFilters}
-                className="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-2xl hover:shadow-lg transition-all transform hover:scale-105"
+                className="px-4 py-2 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-all"
               >
-                Réinitialiser les filtres
+                Effacer filtres
               </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
-        <div className="mt-20 mb-16">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            {activeMode === 'online' 
-              ? 'Pourquoi choisir nos formations en ligne ?'
-              : 'Pourquoi choisir nos formations en présentiel ?'
-            }
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {activeMode === 'online' ? (
+        <div className="flex gap-8">
+          {/* SIDEBAR GAUCHE - CATEGORIES */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-32 bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Award className="h-5 w-5 text-purple-600" />
+                Catégories
+              </h3>
+              
+              <div className="space-y-2">
+                <button
+                  onClick={() => setSelectedCategory('')}
+                  className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between ${
+                    selectedCategory === ''
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                      : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <span className="font-medium">Toutes</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                
+                {filterData.categories.map((category) => {
+                  const IconComponent = categoryConfig[category.name]?.icon || Code;
+                  const isActive = selectedCategory === category.id.toString();
+                  
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category.id.toString())}
+                      className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${
+                        isActive
+                          ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <IconComponent className={`h-4 w-4 ${isActive ? 'text-white' : 'text-purple-600'}`} />
+                        <div>
+                          <div className="font-medium text-sm">{category.name}</div>
+                          <div className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
+                            {category.trainings_count} formations
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className={`h-4 w-4 transition-transform ${isActive ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </aside>
+
+          {/* CONTENU PRINCIPAL */}
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-3">
+                  {activeMode === 'online' ? (
+                    <>
+                      <Wifi className="h-6 w-6 text-blue-600" />
+                      Formations en ligne
+                    </>
+                  ) : (
+                    <>
+                      <Building className="h-6 w-6 text-purple-600" />
+                      Formations en présentiel
+                    </>
+                  )}
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  {totalResults} formation{totalResults > 1 ? 's' : ''} disponible{totalResults > 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center items-center py-16">
+                <div className="text-center">
+                  <Loader2 className="h-12 w-12 text-purple-600 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Chargement des formations...</p>
+                </div>
+              </div>
+            ) : trainings.length > 0 ? (
               <>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 text-center">
-                  <div className="text-4xl mb-4">⚡</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Flexibilité totale</h3>
-                  <p className="text-gray-600">Apprenez à votre rythme, où vous voulez, quand vous voulez</p>
+                <div className="grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                  {trainings.map((training) => (
+                    activeMode === 'online' ? (
+                      <OnlineTrainingCard key={training.id} course={training as ApiFormation} />
+                    ) : (
+                      <InPersonTrainingCard key={training.id} training={training as ApiInPersonTraining} />
+                    )
+                  ))}
                 </div>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 text-center">
-                  <div className="text-4xl mb-4">💰</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Tarifs avantageux</h3>
-                  <p className="text-gray-600">Formations de qualité à des prix accessibles</p>
-                </div>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 text-center">
-                  <div className="text-4xl mb-4">🔄</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Mise à jour continue</h3>
-                  <p className="text-gray-600">Contenus régulièrement actualisés selon les dernières tendances</p>
-                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-12">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1 || loading}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Précédent
+                    </button>
+                    
+                    <div className="flex gap-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        const pageNum = Math.max(1, currentPage - 2) + i;
+                        if (pageNum > totalPages) return null;
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            disabled={loading}
+                            className={`px-4 py-2 rounded-lg font-medium ${
+                              currentPage === pageNum
+                                ? 'bg-purple-600 text-white'
+                                : 'border border-gray-300 hover:bg-gray-50'
+                            } disabled:opacity-50`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages || loading}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
-              <>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 text-center">
-                  <div className="text-4xl mb-4">🤝</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Interaction directe</h3>
-                  <p className="text-gray-600">Échangez directement avec les formateurs et autres participants</p>
+              <div className="text-center py-16">
+                <div className="bg-white rounded-3xl shadow-xl p-12 max-w-md mx-auto border border-gray-100">
+                  <div className="text-6xl mb-6">
+                    {activeMode === 'online' ? '💻' : '🏢'}
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Aucune formation trouvée</h3>
+                  <p className="text-gray-600 mb-8 leading-relaxed">
+                    {searchTerm || selectedCategory || selectedCity
+                      ? 'Essayez de modifier vos critères de recherche.'
+                      : `Aucune formation ${activeMode === 'online' ? 'en ligne' : 'en présentiel'} disponible pour le moment.`
+                    }
+                  </p>
+                  <button
+                    onClick={clearAllFilters}
+                    className="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-2xl hover:shadow-lg transition-all transform hover:scale-105"
+                  >
+                    Réinitialiser les filtres
+                  </button>
                 </div>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 text-center">
-                  <div className="text-4xl mb-4">🎯</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Pratique intensive</h3>
-                  <p className="text-gray-600">Mises en situation réelles avec feedback immédiat</p>
-                </div>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 text-center">
-                  <div className="text-4xl mb-4">🌐</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Réseau professionnel</h3>
-                  <p className="text-gray-600">Construisez votre réseau avec d'autres professionnels</p>
-                </div>
-              </>
+              </div>
             )}
           </div>
         </div>

@@ -140,8 +140,8 @@ class InPersonTrainingController extends Controller
         $firstName = $names[0];
         $lastName = $names[1] ?? '';
 
-        // Provide default email to satisfy NOT NULL constraint
-        $defaultEmail = strtolower($firstName) . '.' . strtolower($lastName) . '@example.com';
+        // Provide unique default email to satisfy NOT NULL constraint
+        $defaultEmail = strtolower($firstName) . '.' . strtolower($lastName) . '.' . time() . '@example.com';
 
         $trainer = \App\Models\Trainer::firstOrCreate(
             ['first_name' => $firstName, 'last_name' => $lastName],
@@ -233,8 +233,8 @@ class InPersonTrainingController extends Controller
             $firstName = $names[0];
             $lastName = $names[1] ?? '';
 
-            // Provide default email to satisfy NOT NULL constraint
-            $defaultEmail = strtolower($firstName) . '.' . strtolower($lastName) . '@example.com';
+            // Provide unique default email to satisfy NOT NULL constraint
+            $defaultEmail = strtolower($firstName) . '.' . strtolower($lastName) . '.' . time() . '@example.com';
 
             $trainer = \App\Models\Trainer::firstOrCreate(
                 ['first_name' => $firstName, 'last_name' => $lastName],
