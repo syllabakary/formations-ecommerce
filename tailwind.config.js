@@ -4,11 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#C71585',
-        secondary: '#A020F0',
+        primary: '#A553C4',
+        secondary: '#6636DD',
         success: '#22c55e',
-        warning: '#f97316',
-        danger: '#ef4444',
+        warning: '#2D1397',
+        danger: '#2D1397',
+      },
+      animation: {
+        shake: 'shake 0.5s ease-in-out',
+      },
+      keyframes: {
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '25%': { transform: 'translateX(-5px)' },
+          '75%': { transform: 'translateX(5px)' },
+        },
       },
     },
   },
